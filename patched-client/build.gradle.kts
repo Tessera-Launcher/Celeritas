@@ -18,6 +18,12 @@ val baseDir = layout.buildDirectory.dir("base")
 val clientJar = baseDir.map { it.file("client.jar") }
 val librariesDir = baseDir.map { it.dir("libraries") }
 val clientOut = layout.buildDirectory.file("libs/client.jar")
+val clientBaseOut = layout.buildDirectory.file("libs/client-base.jar")
+val patchOut = layout.buildDirectory.file("libs/client.tpatch")
+val patchToolDir = rootProject.layout.projectDirectory.dir("patch-tool")
+val patchTool = patchToolDir.file(
+    "target/release/celeritas-patch-tool" + if (System.getProperty("os.name").startsWith("Windows", true)) ".exe" else ""
+).asFile
 val shimJar = layout.projectDirectory.file("libs/lwjgl3-shim.jar").asFile
 val celeritasJar = providers.gradleProperty("celeritasJar")
     .map { file(it) }
@@ -134,6 +140,7 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
     dependsOn(downloadInputs, tasks.named("classes"))
     mainClass.set("org.taumc.celeritas.patcher.OfflinePatcher")
     outputs.file(clientOut)
+    outputs.file(clientBaseOut)
     inputs.files(sourceSets.main.get().output, celeritasJar, clientJar, shimJar, libraryJars)
     notCompatibleWithConfigurationCache("runs the offline patcher with a downloaded class path")
 
@@ -158,6 +165,7 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
         args = listOf(
             clientJar.get().asFile.absolutePath,
             clientOut.get().asFile.absolutePath,
+            clientBaseOut.get().asFile.absolutePath,
             celeritasJar.get().absolutePath,
             shimJar.absolutePath,
             mixinExtras.absolutePath
@@ -166,8 +174,39 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
     }
 }
 
+val buildPatchTool = tasks.register<Exec>("buildPatchTool") {
+    description = "Build the Rust patch generator/applier"
+    group = "build"
+    workingDir = patchToolDir.asFile
+    commandLine("cargo", "build", "--release")
+    inputs.files(fileTree(patchToolDir) {
+        include("Cargo.toml", "Cargo.lock", "src/**")
+    })
+    outputs.file(patchTool)
+    notCompatibleWithConfigurationCache("runs cargo outside Gradle")
+}
+
+val generatePatch = tasks.register<Exec>("generatePatch") {
+    description = "Generate client.tpatch from client-base.jar and client.jar"
+    group = "build"
+    dependsOn(patchClientJar, buildPatchTool)
+    inputs.files(clientBaseOut, clientOut)
+    outputs.file(patchOut)
+    notCompatibleWithConfigurationCache("runs the Rust patch generator")
+    doFirst {
+        commandLine(
+            patchTool.absolutePath,
+            "generate",
+            clientBaseOut.get().asFile.absolutePath,
+            clientOut.get().asFile.absolutePath,
+            patchOut.get().asFile.absolutePath,
+            "celeritas-1.8.9"
+        )
+    }
+}
+
 tasks.named("assemble") {
-    dependsOn(patchClientJar)
+    dependsOn(patchClientJar, generatePatch)
 }
 
 // The old target packaged a -javaagent jar. Only the patched client is built

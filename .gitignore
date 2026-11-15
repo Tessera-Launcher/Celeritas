@@ -47,3 +47,6 @@ bin/
 
 # Game logs from patched-client/run-test.sh
 /logs/
+
+# Rust patch tool build output
+/patch-tool/target/

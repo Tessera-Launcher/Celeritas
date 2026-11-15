@@ -60,18 +60,19 @@ public final class OfflinePatcher {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 5) {
-            System.err.println("usage: OfflinePatcher <client.jar> <out.jar> <celeritas.jar> "
-                    + "<lwjgl3-shim.jar> <mixinextras.jar> [library.jar...]");
+        if (args.length < 6) {
+            System.err.println("usage: OfflinePatcher <client.jar> <patched.jar> <normalized-base.jar> "
+                    + "<celeritas.jar> <lwjgl3-shim.jar> <mixinextras.jar> [library.jar...]");
             System.exit(2);
         }
         Path client = Path.of(args[0]);
         Path output = Path.of(args[1]);
-        Path celeritas = Path.of(args[2]);
-        Path lwjgl3Shim = Path.of(args[3]);
-        Path mixinextras = Path.of(args[4]);
+        Path normalizedBase = Path.of(args[2]);
+        Path celeritas = Path.of(args[3]);
+        Path lwjgl3Shim = Path.of(args[4]);
+        Path mixinextras = Path.of(args[5]);
         List<Path> libraries = new ArrayList<>();
-        for (int i = 5; i < args.length; i++) {
+        for (int i = 6; i < args.length; i++) {
             libraries.add(Path.of(args[i]));
         }
         for (Path required : List.of(client, celeritas, lwjgl3Shim, mixinextras)) {
@@ -90,14 +91,21 @@ public final class OfflinePatcher {
         Files.createDirectories(parent);
         Path tmp = parent.resolve(output.getFileName() + ".tmp");
         Files.deleteIfExists(tmp);
+        Path baseParent = normalizedBase.toAbsolutePath().getParent();
+        Files.createDirectories(baseParent);
+        Path baseTmp = baseParent.resolve(normalizedBase.getFileName() + ".tmp");
+        Files.deleteIfExists(baseTmp);
         Set<String> written = new HashSet<>();
+        Set<String> baseWritten = new HashSet<>();
         Set<String> generated = new TreeSet<>();
         int patched = 0;
         int merged = 0;
         int rewrittenLibraries = 0;
 
         try (ZipFile base = new ZipFile(client.toFile());
-             ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(tmp)))) {
+             ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(tmp)));
+             ZipOutputStream baseOut = new ZipOutputStream(
+                     new BufferedOutputStream(Files.newOutputStream(baseTmp)))) {
             Enumeration<? extends ZipEntry> entries = base.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
@@ -106,6 +114,13 @@ public final class OfflinePatcher {
                 }
                 String name = safe(entry.getName());
                 byte[] bytes = base.getInputStream(entry).readAllBytes();
+                // The patch is generated against this normalized jar, not the
+                // raw Mojang download: signatures are gone and the manifest is
+                // unsealed before a single class is patched.
+                byte[] baseBytes = name.equalsIgnoreCase("META-INF/MANIFEST.MF")
+                        ? unsealed(new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8)
+                        : bytes;
+                writeBase(baseOut, baseWritten, name, baseBytes);
                 if (name.equalsIgnoreCase("META-INF/MANIFEST.MF")) {
                     bytes = patchedManifest(new String(bytes, StandardCharsets.UTF_8))
                             .getBytes(StandardCharsets.UTF_8);
@@ -141,6 +156,7 @@ public final class OfflinePatcher {
             }
         }
         Files.move(tmp, output, StandardCopyOption.REPLACE_EXISTING);
+        Files.move(baseTmp, normalizedBase, StandardCopyOption.REPLACE_EXISTING);
 
         System.out.println("client.jar: patched classes=" + patched
                 + ", merged entries=" + merged
@@ -380,17 +396,41 @@ public final class OfflinePatcher {
     }
 
     /**
+     * The manifest with its {@code Sealed:} lines removed.
+     *
+     * Line endings are preserved (including CRLF), matching Tessera's
+     * {@code jar::normalize}; the patch's base hashes are over these exact
+     * uncompressed entry bytes.
+     */
+    private static String unsealed(String manifest) {
+        StringBuilder out = new StringBuilder(manifest.length());
+        int start = 0;
+        while (start < manifest.length()) {
+            int newline = manifest.indexOf('\n', start);
+            int end = newline < 0 ? manifest.length() : newline + 1;
+            String line = manifest.substring(start, end);
+            String bare = line.endsWith("\n") ? line.substring(0, line.length() - 1) : line;
+            if (bare.endsWith("\r")) {
+                bare = bare.substring(0, bare.length() - 1);
+            }
+            if (!bare.trim().toLowerCase(Locale.ROOT).startsWith("sealed:")) {
+                out.append(line);
+            }
+            start = end;
+        }
+        return out.toString();
+    }
+
+    /**
      * Strip {@code Sealed:} and add the marker Tessera reads to decide whether
      * the client jar has to come before the ordinary libraries.
      */
     private static String patchedManifest(String manifest) {
-        StringBuilder out = new StringBuilder(manifest.length());
+        String unsealed = unsealed(manifest);
+        StringBuilder out = new StringBuilder(unsealed.length() + CLIENT_PATCH.length() + 1);
         boolean marked = false;
-        for (String line : manifest.split("\n", -1)) {
+        for (String line : unsealed.split("\n", -1)) {
             String bare = line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
-            if (bare.trim().toLowerCase(Locale.ROOT).startsWith("sealed:")) {
-                continue;
-            }
             if (!marked && bare.trim().toLowerCase(Locale.ROOT).startsWith("tessera-client-patch:")) {
                 marked = true;
             }

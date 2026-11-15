@@ -1,0 +1,13 @@
+[package]
+name = "celeritas-patch-tool"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+hex = "0.4"
+qbsdiff = "1.4.4"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+toml = "0.8"
+zip = { version = "9", default-features = false, features = ["deflate"] }
