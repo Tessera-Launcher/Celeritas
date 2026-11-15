@@ -54,6 +54,7 @@ public final class OfflinePatcher {
             "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable",
             "org/taumc/celeritas/patch/CallbackInfoReturnable"));
     private static final String[] SHIMS = {"CallbackInfo", "CallbackInfoReturnable"};
+    private static final String CLIENT_PATCH = "Tessera-Client-Patch: celeritas-lwjgl3";
 
     private OfflinePatcher() {
     }
@@ -106,7 +107,8 @@ public final class OfflinePatcher {
                 String name = safe(entry.getName());
                 byte[] bytes = base.getInputStream(entry).readAllBytes();
                 if (name.equalsIgnoreCase("META-INF/MANIFEST.MF")) {
-                    bytes = unsealed(new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
+                    bytes = patchedManifest(new String(bytes, StandardCharsets.UTF_8))
+                            .getBytes(StandardCharsets.UTF_8);
                 } else if (name.endsWith(".class")) {
                     byte[] transformed = transform(name, bytes);
                     if (transformed != bytes) {
@@ -129,8 +131,8 @@ public final class OfflinePatcher {
 
             if (!written.contains("META-INF/MANIFEST.MF")) {
                 writeAdded(out, written, "META-INF/MANIFEST.MF",
-                        "Manifest-Version: 1.0\r\nMain-Class: net.minecraft.client.Main\r\n\r\n"
-                                .getBytes(StandardCharsets.UTF_8));
+                        ("Manifest-Version: 1.0\r\nMain-Class: net.minecraft.client.Main\r\n"
+                                + CLIENT_PATCH + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             }
             for (String name : written) {
                 if (name.startsWith("org/spongepowered/") || name.startsWith("org/objectweb/asm/")) {
@@ -377,14 +379,29 @@ public final class OfflinePatcher {
                 || upper.endsWith(".DSA") || upper.endsWith(".EC"));
     }
 
-    private static String unsealed(String manifest) {
+    /**
+     * Strip {@code Sealed:} and add the marker Tessera reads to decide whether
+     * the client jar has to come before the ordinary libraries.
+     */
+    private static String patchedManifest(String manifest) {
         StringBuilder out = new StringBuilder(manifest.length());
+        boolean marked = false;
         for (String line : manifest.split("\n", -1)) {
             String bare = line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
             if (bare.trim().toLowerCase(Locale.ROOT).startsWith("sealed:")) {
                 continue;
             }
+            if (!marked && bare.trim().toLowerCase(Locale.ROOT).startsWith("tessera-client-patch:")) {
+                marked = true;
+            }
+            if (!marked && bare.trim().isEmpty()) {
+                out.append(CLIENT_PATCH).append('\n');
+                marked = true;
+            }
             out.append(bare).append('\n');
+        }
+        if (!marked) {
+            out.append(CLIENT_PATCH).append('\n');
         }
         return out.toString();
     }
