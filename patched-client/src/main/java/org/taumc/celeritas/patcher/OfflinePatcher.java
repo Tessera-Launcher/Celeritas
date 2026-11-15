@@ -60,9 +60,9 @@ public final class OfflinePatcher {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 6) {
+        if (args.length < 7) {
             System.err.println("usage: OfflinePatcher <client.jar> <patched.jar> <normalized-base.jar> "
-                    + "<celeritas.jar> <lwjgl3-shim.jar> <mixinextras.jar> [library.jar...]");
+                    + "<celeritas.jar> <lwjgl3-shim.jar> <mixinextras.jar> <fastutil.jar> [library.jar...]");
             System.exit(2);
         }
         Path client = Path.of(args[0]);
@@ -71,11 +71,12 @@ public final class OfflinePatcher {
         Path celeritas = Path.of(args[3]);
         Path lwjgl3Shim = Path.of(args[4]);
         Path mixinextras = Path.of(args[5]);
+        Path fastutil = Path.of(args[6]);
         List<Path> libraries = new ArrayList<>();
-        for (int i = 6; i < args.length; i++) {
+        for (int i = 7; i < args.length; i++) {
             libraries.add(Path.of(args[i]));
         }
-        for (Path required : List.of(client, celeritas, lwjgl3Shim, mixinextras)) {
+        for (Path required : List.of(client, celeritas, lwjgl3Shim, mixinextras, fastutil)) {
             if (!Files.isRegularFile(required)) {
                 throw new IOException("missing input " + required);
             }
@@ -145,6 +146,7 @@ public final class OfflinePatcher {
             merged += addCeleritas(out, written, celeritas);
             merged += addLwjgl3(out, written, lwjgl3Shim);
             merged += addMixinExtras(out, written, mixinextras);
+            merged += addFastutil(out, written, fastutil);
             for (Path library : libraries) {
                 rewrittenLibraries += addRewrittenLibrary(out, written, library);
             }
@@ -263,6 +265,25 @@ public final class OfflinePatcher {
                 String name = entry.getName();
                 if (entry.isDirectory() || signature(name) || skipMetadata(name)
                         || !name.startsWith("com/llamalad7/")) {
+                    continue;
+                }
+                if (writeAdded(out, written, safe(name), zip.getInputStream(entry).readAllBytes())) {
+                    added++;
+                }
+            }
+        }
+        return added;
+    }
+
+    private static int addFastutil(ZipOutputStream out, Set<String> written, Path jar) throws Exception {
+        int added = 0;
+        try (ZipFile zip = new ZipFile(jar.toFile())) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (entry.isDirectory() || signature(name) || skipMetadata(name)
+                        || name.endsWith("module-info.class")) {
                     continue;
                 }
                 if (writeAdded(out, written, safe(name), zip.getInputStream(entry).readAllBytes())) {
@@ -392,7 +413,7 @@ public final class OfflinePatcher {
         return name.equalsIgnoreCase("META-INF/MANIFEST.MF")
                 || name.startsWith("META-INF/maven/")
                 || name.startsWith("META-INF/services/")
-                || name.equals("module-info.class")
+                || name.endsWith("module-info.class")
                 || (upper.startsWith("META-INF/") && upper.endsWith(".SF"));
     }
 

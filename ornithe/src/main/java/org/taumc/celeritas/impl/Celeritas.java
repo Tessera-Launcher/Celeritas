@@ -12,7 +12,7 @@ import org.embeddedt.embeddium.impl.gui.SodiumGameOptions;
  */
 public class Celeritas {
     public static final String MODID = "celeritas";
-    public static final String VERSION = "2.5.0-patch";
+    public static final String VERSION = "2.5.0-patch2";
 
     private static final Logger LOGGER = LogManager.getLogger("celeritas");
     private static SodiumGameOptions CONFIG;
