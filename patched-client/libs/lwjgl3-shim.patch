@@ -1,0 +1,56 @@
+# Local change to Tessera's LWJGL3 shim (GPL-3.0-or-later), applied to
+# libs/lwjgl3-shim.jar on top of
+# crates/tessera-core/assets/lwjgl3-agent-src/org/lwjgl/input/Mouse.java
+# from the Tessera history (commit 02df919^).
+#
+# LWJGL 2 queues cursor movement as a mouse event with button -1; the shim only
+# queued button and wheel events. Vanilla dispatches GuiScreen.mouseDragged from
+# those movement events and only ever polls drag state once per event, so with
+# the shim as-is no slider or list scrollbar could be dragged. Rebuild with:
+#   git -C <tessera> show 02df919^:crates/tessera-core/assets/lwjgl3-agent-src/\
+#     org/lwjgl/input/Mouse.java > org/lwjgl/input/Mouse.java
+#   patch -p0 < libs/lwjgl3-shim.patch
+#   javac -cp "<lwjgl3-shim.jar>:lwjgl-3.4.3.jar:lwjgl-glfw-3.4.3.jar:\
+#     lwjgl-opengl-3.4.3.jar:lwjgl-openal-3.4.3.jar" -d out \
+#     org/lwjgl/input/Mouse.java
+#   jar uf lwjgl3-shim.jar -C out org/lwjgl/input/Mouse.class
+--- a/org/lwjgl/input/Mouse.java
++++ b/org/lwjgl/input/Mouse.java
+@@ -56,16 +56,35 @@
+         resetPosition();
+ 
+         glfwSetCursorPosCallback(window, (win, x, y) -> {
++            boolean moved = false;
+             synchronized (Mouse.class) {
+                 if (haveLast) {
+-                    dx += (int) Math.round(x - lastX);
++                    int stepX = (int) Math.round(x - lastX);
+                     // GLFW's y grows downwards, LWJGL 2's grows upwards.
+-                    dy -= (int) Math.round(y - lastY);
++                    int stepY = -(int) Math.round(y - lastY);
++                    dx += stepX;
++                    dy += stepY;
++                    moved = stepX != 0 || stepY != 0;
+                 }
+                 lastX = x;
+                 lastY = y;
+                 haveLast = true;
+             }
++            if (moved) {
++                // LWJGL 2 queues cursor movement as an event too (button -1).
++                // The game dispatches mouseDragged from those events and polls
++                // the drag state once per event, so without them sliders and
++                // list scrollbars cannot be dragged. Consecutive movements are
++                // coalesced: only the newest position is ever needed.
++                synchronized (EVENTS) {
++                    Event tail = EVENTS.peekLast();
++                    if (tail != null && tail.button == -1 && tail.wheel == 0) {
++                        EVENTS.removeLast();
++                    }
++                    EVENTS.add(new Event(-1, false, (int) Math.round(getCursorX()),
++                            (int) Math.round(getCursorY()), 0));
++                }
++            }
+         });
+ 
+         glfwSetMouseButtonCallback(window, (win, button, action, mods) -> {
