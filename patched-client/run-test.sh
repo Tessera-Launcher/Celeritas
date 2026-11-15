@@ -7,12 +7,12 @@ TESSERA_DATA="${TESSERA_DATA:-/home/ygbs/桌面/Tessera/target/debug/data}"
 GAME="$TESSERA_DATA/游戏"
 VERS="$GAME/versions/1.8.9"
 JAVA="$TESSERA_DATA/依赖/java/28+24-ea-beta/bin/java"
-CLIENT="$(pwd)/agent/build/libs/client.jar"
+CLIENT="$(pwd)/patched-client/build/libs/client.jar"
 RUNDIR="${RUNDIR:-/tmp/celeritas-run}"
 mkdir -p "$RUNDIR"
 
 if [ ! -f "$CLIENT" ]; then
-  echo "missing $CLIENT; build :agent:patchClientJar first" >&2
+  echo "missing $CLIENT; build :patched-client:patchClientJar first" >&2
   exit 1
 fi
 

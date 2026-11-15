@@ -1,4 +1,4 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -8,7 +8,7 @@ import org.spongepowered.asm.service.IGlobalPropertyService;
 import org.spongepowered.asm.service.IPropertyKey;
 
 /** Mixin expects a global property store; a map is enough for one agent. */
-public final class AgentGlobalPropertyService implements IGlobalPropertyService {
+public final class PatcherGlobalPropertyService implements IGlobalPropertyService {
     private record BasicProperty(String name) implements IPropertyKey {
         @Override
         public boolean equals(Object other) {

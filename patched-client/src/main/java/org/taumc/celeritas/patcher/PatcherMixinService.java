@@ -1,4 +1,4 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -20,10 +20,10 @@ import org.spongepowered.asm.service.ITransformerProvider;
 import org.spongepowered.asm.service.MixinServiceAbstract;
 
 /** Minimal Mixin service for a plain {@code -javaagent} launch. */
-public final class AgentMixinService extends MixinServiceAbstract {
+public final class PatcherMixinService extends MixinServiceAbstract {
     private final AgentClassProvider classProvider = new AgentClassProvider();
-    private final AgentBytecodeProvider bytecodeProvider = new AgentBytecodeProvider();
-    private final AgentAuditTrail auditTrail = new AgentAuditTrail();
+    private final PatcherBytecodeProvider bytecodeProvider = new PatcherBytecodeProvider();
+    private final PatcherAuditTrail auditTrail = new PatcherAuditTrail();
 
     @Override
     public String getName() {
@@ -77,7 +77,7 @@ public final class AgentMixinService extends MixinServiceAbstract {
 
     @Override
     public Collection<String> getPlatformAgents() {
-        return Collections.singletonList("org.taumc.celeritas.agent.AgentPlatformService");
+        return Collections.singletonList("org.taumc.celeritas.patcher.PatcherPlatformService");
     }
 
     @Override
@@ -87,7 +87,7 @@ public final class AgentMixinService extends MixinServiceAbstract {
 
     @Override
     public InputStream getResourceAsStream(String name) {
-        ClassLoader loader = AgentMixinService.class.getClassLoader();
+        ClassLoader loader = PatcherMixinService.class.getClassLoader();
         InputStream stream = loader.getResourceAsStream(name);
         if (stream == null) {
             stream = ClassLoader.getSystemResourceAsStream(name);

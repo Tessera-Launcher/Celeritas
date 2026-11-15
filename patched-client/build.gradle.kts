@@ -18,7 +18,7 @@ val baseDir = layout.buildDirectory.dir("base")
 val clientJar = baseDir.map { it.file("client.jar") }
 val librariesDir = baseDir.map { it.dir("libraries") }
 val clientOut = layout.buildDirectory.file("libs/client.jar")
-val lwjgl3Jar = layout.projectDirectory.file("libs/lwjgl3-agent.jar").asFile
+val shimJar = layout.projectDirectory.file("libs/lwjgl3-shim.jar").asFile
 val celeritasJar = providers.gradleProperty("celeritasJar")
     .map { file(it) }
     .orElse(provider { file("build/celeritas-official.jar") })
@@ -124,24 +124,24 @@ val downloadInputs = tasks.register("downloadInputs") {
 val libraryJars = fileTree(librariesDir) { include("**/*.jar") }
 
 /**
- * Applies Celeritas' mixins and Tessera's LWJGL3 rewrite directly to the
- * downloaded client jar. The result has no agent manifest and no Mixin/ASM
- * classes; it is the client jar a launcher should put on the class path.
+ * Applies Celeritas' mixins and the LWJGL3 rewrite directly to the downloaded
+ * client jar. The result has no agent manifest and no Mixin/ASM classes; it is
+ * the client jar a launcher should put on the class path.
  */
 val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
     description = "Build a client.jar with Celeritas and the LWJGL3 shim applied"
     group = "build"
     dependsOn(downloadInputs, tasks.named("classes"))
-    mainClass.set("org.taumc.celeritas.agent.OfflinePatcher")
+    mainClass.set("org.taumc.celeritas.patcher.OfflinePatcher")
     outputs.file(clientOut)
-    inputs.files(celeritasJar, clientJar, libraryJars)
+    inputs.files(sourceSets.main.get().output, celeritasJar, clientJar, shimJar, libraryJars)
     notCompatibleWithConfigurationCache("runs the offline patcher with a downloaded class path")
 
     doFirst {
         if (!celeritasJar.get().isFile) {
             throw GradleException(
                 "missing ${celeritasJar.get()}; build :ornithe:$mcVersion:packageJar " +
-                    "and run agent/remap-official.sh first (or pass -PceleritasJar=...)"
+                    "and run patched-client/remap-official.sh first (or pass -PceleritasJar=...)"
             )
         }
         val mixinExtras = configurations.runtimeClasspath.get().files
@@ -152,7 +152,6 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
             sourceSets.main.get().output,
             configurations.runtimeClasspath,
             celeritasJar.get(),
-            lwjgl3Jar,
             clientJar.get().asFile,
             libraries
         )
@@ -160,7 +159,7 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
             clientJar.get().asFile.absolutePath,
             clientOut.get().asFile.absolutePath,
             celeritasJar.get().absolutePath,
-            lwjgl3Jar.absolutePath,
+            shimJar.absolutePath,
             mixinExtras.absolutePath
         ) + libraries.map { it.absolutePath }
         jvmArgs("-Xmx2g")

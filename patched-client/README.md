@@ -12,25 +12,25 @@ its runtime class path.
 ./gradlew :ornithe:1.8.9:packageJar -Pceleritas_target_versions=1.8.9
 
 # 2. remap it to Mojang official names for the vanilla client jar
-./agent/remap-official.sh
+./patched-client/remap-official.sh
 
 # 3. download the official 1.8.9 client + libraries, then build the patched jar
-./gradlew :agent:patchClientJar -Pceleritas_target_versions=1.8.9
+./gradlew :patched-client:patchClientJar -Pceleritas_target_versions=1.8.9
 ```
 
 Step 3 fetches `version_manifest_v2.json`, the 1.8.9 version JSON, its
-`client.jar` and library artifacts from Mojang into `agent/build/base/`, verifies
+`client.jar` and library artifacts from Mojang into `patched-client/build/base/`, verifies
 their SHA-1, strips signatures/`Sealed:` from the client jar exactly like
 Tessera's installer, and writes:
 
 ```text
-agent/build/libs/client.jar
+patched-client/build/libs/client.jar
 ```
 
 The output must precede the ordinary game libraries on the class path: a few
 third-party classes that call LWJGL2 (currently paulscode's OpenAL wrapper) are
 rewritten and copied into the jar so they win over the original library jars.
-`agent/run-test.sh` does this and launches without `-javaagent`.
+`patched-client/run-test.sh` does this and launches without `-javaagent`.
 
 `-PceleritasJar=...` overrides the remapped input jar. Mixin, MixinExtras and ASM
 are build-time dependencies only; the patcher filters them out of the output.
@@ -74,6 +74,6 @@ F3 shows `Celeritas Renderer (2.5.0-patch)`.
 ## Licensing
 
 The patcher and shim code in this directory are part of Celeritas (LGPL-3.0).
-The generated client.jar embeds Tessera's `lwjgl3-agent.jar`, which is
+The generated client.jar embeds Tessera's LWJGL3 shim classes, which are
 GPL-3.0-or-later; the combined jar is distributed under GPL-3.0-or-later.
 Celeritas' own classes remain LGPL-3.0.

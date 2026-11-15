@@ -3,7 +3,7 @@
 # official names, so the patcher can target Tessera's ordinary 1.8.9 client jar.
 #
 # Run  ./gradlew :ornithe:1.8.9:packageJar -Pceleritas_target_versions=1.8.9
-# first, then this script.  The result is agent/build/celeritas-official.jar.
+# first, then this script.  The result is patched-client/build/celeritas-official.jar.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,7 +13,7 @@ if [ -z "$VERSION" ]; then
   VERSION="$VERSION-dev"
 fi
 INPUT="build/libs/$VERSION/celeritas-fabriclike-mc8.9-$VERSION.jar"
-OUTPUT="agent/build/celeritas-official.jar"
+OUTPUT="patched-client/build/celeritas-official.jar"
 TESSERA_DATA="${TESSERA_DATA:-/home/ygbs/桌面/Tessera/target/debug/data}"
 GAME="$TESSERA_DATA/游戏"
 
@@ -21,7 +21,7 @@ if [ ! -f "$INPUT" ]; then
   echo "missing $INPUT; build :ornithe:1.8.9:packageJar first" >&2
   exit 1
 fi
-mkdir -p agent/build
+mkdir -p patched-client/build
 
 MAPPINGS=$(find "$HOME/.gradle/caches/fabric-loom/1.8.9" -name mappings.tiny | head -1)
 MCJAR=$(find "$HOME/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-calamus-gen1-intermediary-v2-intermediary" -name '*.jar' | head -1)
@@ -39,7 +39,7 @@ fi
 
 CP="$(dirname "$0")/build/remap-classes"
 mkdir -p "$CP"
-javac -cp "$TR:$MIO:$ASM" -d "$CP" agent/tools/RemapCeleritas.java
+javac -cp "$TR:$MIO:$ASM" -d "$CP" patched-client/tools/RemapCeleritas.java
 
 mapfile -t LIBS < <(python3 - "$GAME/versions/1.8.9/1.8.9.json" "$GAME" <<'PY'
 import json,sys,os

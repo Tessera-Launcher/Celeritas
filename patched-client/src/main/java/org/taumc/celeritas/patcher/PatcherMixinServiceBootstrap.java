@@ -1,9 +1,9 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import org.spongepowered.asm.service.IMixinServiceBootstrap;
 
-/** Service-loader entry point for {@link AgentMixinService}. */
-public final class AgentMixinServiceBootstrap implements IMixinServiceBootstrap {
+/** Service-loader entry point for {@link PatcherMixinService}. */
+public final class PatcherMixinServiceBootstrap implements IMixinServiceBootstrap {
     @Override
     public String getName() {
         return "celeritas-patcher";
@@ -11,7 +11,7 @@ public final class AgentMixinServiceBootstrap implements IMixinServiceBootstrap 
 
     @Override
     public String getServiceClassName() {
-        return AgentMixinService.class.getName();
+        return PatcherMixinService.class.getName();
     }
 
     @Override

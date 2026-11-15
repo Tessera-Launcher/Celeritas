@@ -190,7 +190,7 @@ if (includedProjectCount == 0) {
 }
 
 // The standalone 1.8.9 patched client: Celeritas mixins + Tessera's LWJGL3 shim applied to client.jar.
-if (file("agent").exists() && isVersionIncluded("1.8.9")) {
-    include("agent")
+if (file("patched-client").exists() && isVersionIncluded("1.8.9")) {
+    include("patched-client")
     includedProjectCount++
 }

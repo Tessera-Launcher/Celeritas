@@ -1,4 +1,4 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import java.util.Collection;
 
@@ -10,7 +10,7 @@ import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.util.Constants;
 
 /** Tells Mixin it is running on a plain client JVM. */
-public final class AgentPlatformService extends MixinPlatformAgentAbstract implements IMixinPlatformServiceAgent {
+public final class PatcherPlatformService extends MixinPlatformAgentAbstract implements IMixinPlatformServiceAgent {
     @Override
     public void init() {
     }

@@ -1,4 +1,4 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -14,7 +14,7 @@ import org.spongepowered.asm.transformers.TreeTransformer;
  * Mixin's public bootstrap is LaunchWrapper-shaped; the transformer itself is
  * not. The offline applier used by this project uses the same reflection.
  */
-final class MixinRuntime {
+final class MixinBridge {
     private static final Object TRANSFORMER;
     private static final Method TRANSFORM_CLASS;
 
@@ -32,7 +32,7 @@ final class MixinRuntime {
         }
     }
 
-    private MixinRuntime() {
+    private MixinBridge() {
     }
 
     static void install() {

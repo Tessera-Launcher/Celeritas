@@ -1,4 +1,4 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,7 +8,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.service.IClassBytecodeProvider;
 
 /** Reads target classes from the game's system class loader. */
-final class AgentBytecodeProvider implements IClassBytecodeProvider {
+final class PatcherBytecodeProvider implements IClassBytecodeProvider {
     private final ClassLoader loader = ClassLoader.getSystemClassLoader();
 
     @Override

@@ -45,5 +45,5 @@ bin/
 # Mixin debug exports from the 1.8.9 patcher
 .mixin.out/
 
-# Game logs from agent/run-test.sh
+# Game logs from patched-client/run-test.sh
 /logs/

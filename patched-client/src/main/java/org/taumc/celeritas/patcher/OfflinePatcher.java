@@ -1,4 +1,4 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import com.llamalad7.mixinextras.MixinExtrasBootstrap;
 import com.llamalad7.mixinextras.utils.ClassGenUtils;
@@ -14,9 +14,6 @@ import org.spongepowered.asm.transformers.MixinClassWriter;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.Instrumentation;
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,7 +36,7 @@ import java.util.zip.ZipOutputStream;
 /**
  * Builds a patched 1.8.9 {@code client.jar} without leaving a runtime agent
  * behind.  Celeritas' mixins are applied to the decompressed client classes,
- * Tessera's LWJGL3 rewriter runs over both those classes and the Celeritas
+ * the LWJGL3 call-site rewriter runs over both those classes and the Celeritas
  * classes, and only the pieces needed at runtime are merged back in.
  */
 public final class OfflinePatcher {
@@ -47,7 +44,7 @@ public final class OfflinePatcher {
     private static final Set<String> MIXIN_SKIP = Set.of(
             "java/", "javax/", "jdk/", "sun/", "com/sun/", "org/w3c/", "org/xml/",
             "org/spongepowered/", "com/llamalad7/", "org/objectweb/asm/",
-            "org/taumc/celeritas/agent/", "org/taumc/celeritas/mixin/",
+            "org/taumc/celeritas/patched-client/", "org/taumc/celeritas/mixin/",
             "org/lwjgl/", "tessera/");
     private static final Pattern GENERATED = Pattern.compile(
             "com/llamalad7/mixinextras/sugar/impl/ref/generated/[A-Za-z0-9_$]+");
@@ -64,19 +61,19 @@ public final class OfflinePatcher {
     public static void main(String[] args) throws Exception {
         if (args.length < 5) {
             System.err.println("usage: OfflinePatcher <client.jar> <out.jar> <celeritas.jar> "
-                    + "<lwjgl3-agent.jar> <mixinextras.jar> [library.jar...]");
+                    + "<lwjgl3-shim.jar> <mixinextras.jar> [library.jar...]");
             System.exit(2);
         }
         Path client = Path.of(args[0]);
         Path output = Path.of(args[1]);
         Path celeritas = Path.of(args[2]);
-        Path lwjgl3 = Path.of(args[3]);
+        Path lwjgl3Shim = Path.of(args[3]);
         Path mixinextras = Path.of(args[4]);
         List<Path> libraries = new ArrayList<>();
         for (int i = 5; i < args.length; i++) {
             libraries.add(Path.of(args[i]));
         }
-        for (Path required : List.of(client, celeritas, lwjgl3, mixinextras)) {
+        for (Path required : List.of(client, celeritas, lwjgl3Shim, mixinextras)) {
             if (!Files.isRegularFile(required)) {
                 throw new IOException("missing input " + required);
             }
@@ -84,10 +81,9 @@ public final class OfflinePatcher {
 
         MixinBootstrap.init();
         MixinBootstrap.getPlatform().inject();
-        MixinRuntime.install();
+        MixinBridge.install();
         MixinExtrasBootstrap.init();
         Mixins.addConfiguration(MIXIN_CONFIG);
-        ClassFileTransformer lwjgl3Rewriter = lwjgl3Transformer();
 
         Path parent = output.toAbsolutePath().getParent();
         Files.createDirectories(parent);
@@ -112,7 +108,7 @@ public final class OfflinePatcher {
                 if (name.equalsIgnoreCase("META-INF/MANIFEST.MF")) {
                     bytes = unsealed(new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
                 } else if (name.endsWith(".class")) {
-                    byte[] transformed = transform(name, bytes, lwjgl3Rewriter);
+                    byte[] transformed = transform(name, bytes);
                     if (transformed != bytes) {
                         patched++;
                     }
@@ -122,11 +118,11 @@ public final class OfflinePatcher {
                 writeBase(out, written, name, bytes);
             }
 
-            merged += addCeleritas(out, written, celeritas, lwjgl3Rewriter);
-            merged += addLwjgl3(out, written, lwjgl3);
+            merged += addCeleritas(out, written, celeritas);
+            merged += addLwjgl3(out, written, lwjgl3Shim);
             merged += addMixinExtras(out, written, mixinextras);
             for (Path library : libraries) {
-                rewrittenLibraries += addRewrittenLibrary(out, written, library, lwjgl3Rewriter);
+                rewrittenLibraries += addRewrittenLibrary(out, written, library);
             }
             merged += addShims(out, written);
             merged += addGenerated(out, written, generated);
@@ -150,7 +146,7 @@ public final class OfflinePatcher {
                 + " -> " + output);
     }
 
-    private static byte[] transform(String name, byte[] bytes, ClassFileTransformer lwjgl3) throws Exception {
+    private static byte[] transform(String name, byte[] bytes) throws Exception {
         if (MIXIN_SKIP.stream().anyMatch(name::startsWith)) {
             return bytes;
         }
@@ -163,12 +159,12 @@ public final class OfflinePatcher {
         ClassNode node = new ClassNode();
         new ClassReader(bytes).accept(node, 0);
         byte[] result = bytes;
-        if (MixinRuntime.transform(node)) {
+        if (MixinBridge.transform(node)) {
             ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             node.accept(writer);
             result = remapCallbacks(writer.toByteArray());
         }
-        byte[] rewritten = lwjgl3.transform(null, name, null, null, result);
+        byte[] rewritten = Lwjgl3Rewriter.rewrite(name, result);
         return rewritten == null ? result : rewritten;
     }
 
@@ -183,8 +179,8 @@ public final class OfflinePatcher {
         return writer.toByteArray();
     }
 
-    private static int addCeleritas(ZipOutputStream out, Set<String> written, Path jar,
-                                    ClassFileTransformer lwjgl3) throws Exception {
+    private static int addCeleritas(ZipOutputStream out, Set<String> written, Path jar)
+            throws Exception {
         int added = 0;
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -198,7 +194,7 @@ public final class OfflinePatcher {
                 }
                 byte[] bytes = zip.getInputStream(entry).readAllBytes();
                 if (name.endsWith(".class")) {
-                    byte[] rewritten = lwjgl3.transform(null, name, null, null, bytes);
+                    byte[] rewritten = Lwjgl3Rewriter.rewrite(name, bytes);
                     if (rewritten != null) {
                         bytes = rewritten;
                     }
@@ -253,13 +249,12 @@ public final class OfflinePatcher {
     }
 
     /**
-     * Tessera's agent rewrites third-party classes at class-load time.  The
-     * static jar cannot do that, so rewritten copies (for example paulscode's
-     * OpenAL wrapper) are placed in the client jar.  The client jar must
-     * precede the ordinary libraries on the classpath.
+     * The static jar cannot rewrite third-party classes at class-load time, so
+     * rewritten copies (for example paulscode's OpenAL wrapper) are placed in
+     * the client jar.  The client jar must precede the ordinary libraries.
      */
-    private static int addRewrittenLibrary(ZipOutputStream out, Set<String> written, Path jar,
-                                           ClassFileTransformer lwjgl3) throws Exception {
+    private static int addRewrittenLibrary(ZipOutputStream out, Set<String> written, Path jar)
+            throws Exception {
         if (!Files.isRegularFile(jar)) {
             return 0;
         }
@@ -273,7 +268,7 @@ public final class OfflinePatcher {
                     continue;
                 }
                 byte[] bytes = zip.getInputStream(entry).readAllBytes();
-                byte[] rewritten = lwjgl3.transform(null, name, null, null, bytes);
+                byte[] rewritten = Lwjgl3Rewriter.rewrite(name, bytes);
                 if (rewritten == null) {
                     continue;
                 }
@@ -325,34 +320,6 @@ public final class OfflinePatcher {
         while (matcher.find()) {
             out.add(matcher.group());
         }
-    }
-
-    private static ClassFileTransformer lwjgl3Transformer() throws Exception {
-        Class<?> agent = Class.forName("TesseraLwjgl3Agent");
-        ClassFileTransformer[] captured = new ClassFileTransformer[1];
-        Instrumentation fake = (Instrumentation) Proxy.newProxyInstance(
-                OfflinePatcher.class.getClassLoader(), new Class<?>[]{Instrumentation.class},
-                (proxy, method, args) -> {
-                    if (method.getName().equals("addTransformer") && args != null && args.length > 0) {
-                        captured[0] = (ClassFileTransformer) args[0];
-                    }
-                    Class<?> type = method.getReturnType();
-                    if (type == boolean.class) {
-                        return false;
-                    }
-                    if (type == int.class) {
-                        return 0;
-                    }
-                    if (type == long.class) {
-                        return 0L;
-                    }
-                    return null;
-                });
-        agent.getMethod("premain", String.class, Instrumentation.class).invoke(null, "", fake);
-        if (captured[0] == null) {
-            throw new IllegalStateException("LWJGL3 transformer did not register");
-        }
-        return captured[0];
     }
 
     private static void writeBase(ZipOutputStream out, Set<String> written, String name, byte[] bytes)

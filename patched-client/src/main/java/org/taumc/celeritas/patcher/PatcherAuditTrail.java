@@ -1,11 +1,11 @@
-package org.taumc.celeritas.agent;
+package org.taumc.celeritas.patcher;
 
 import java.util.logging.Logger;
 
 import org.spongepowered.asm.service.IMixinAuditTrail;
 
 /** Audit output is useful when a mixin silently refuses to apply. */
-final class AgentAuditTrail implements IMixinAuditTrail {
+final class PatcherAuditTrail implements IMixinAuditTrail {
     private static final Logger LOG = Logger.getLogger("celeritas-patcher");
 
     @Override
