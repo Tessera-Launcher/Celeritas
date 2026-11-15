@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiElement;
 import net.minecraft.client.render.TextRenderer;
 import net.minecraft.client.render.Window;
+import net.minecraft.client.render.texture.DynamicTexture;
 import net.minecraft.resource.Identifier;
 import net.minecraft.text.Formatting;
 import net.minecraft.text.LiteralText;
@@ -15,8 +16,14 @@ import net.minecraft.text.TranslatableText;
 import org.embeddedt.embeddium.impl.gui.framework.DrawContext;
 import org.embeddedt.embeddium.impl.gui.framework.TextComponent;
 import org.embeddedt.embeddium.impl.gui.framework.TextFormattingStyle;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
+import org.taumc.celeritas.impl.Celeritas;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +36,17 @@ import java.util.stream.Collectors;
 public class VintageDrawContext implements DrawContext {
     private final TextRenderer font = Minecraft.getInstance().textRenderer;
     private final Map<TextComponent, Text> componentCache = new HashMap<>();
+
+    /**
+     * The GUI icon is loaded straight from the class path instead of through the resource manager: a patched
+     * client (no mod loader) only exposes the {@code minecraft} and {@code realms} resource domains, so an
+     * {@code assets/celeritas/...} texture can never be resolved by {@code TextureManager}. Registering a
+     * {@link DynamicTexture} under its own {@link Identifier} sidesteps that entirely.
+     */
+    private static final String CELERITAS_LOGO = "/assets/celeritas/textures/gui/logo.png";
+    private static boolean celeritasLogoRegistered;
+    @Nullable
+    private static String celeritasLogoId;
 
     private Text convert(TextComponent component) {
         if (component instanceof TextComponent.Literal literal) {
@@ -120,6 +138,44 @@ public class VintageDrawContext implements DrawContext {
     @Override
     public String substrByWidth(String str, int maxWidth, boolean reverse) {
         return font.trim(str, maxWidth, reverse);
+    }
+
+    @Override
+    public @Nullable String getModLogoPath(String modId) {
+        if (!"celeritas".equals(modId)) {
+            return null;
+        }
+        if (!celeritasLogoRegistered) {
+            celeritasLogoRegistered = true;
+            celeritasLogoId = registerCeleritasLogo();
+        }
+        return celeritasLogoId;
+    }
+
+    @Override
+    public TextComponent getFriendlyModName(String modId) {
+        return "celeritas".equals(modId) ? TextComponent.literal("Celeritas") : TextComponent.literal(modId);
+    }
+
+    @Nullable
+    private static String registerCeleritasLogo() {
+        try (InputStream in = VintageDrawContext.class.getResourceAsStream(CELERITAS_LOGO)) {
+            if (in == null) {
+                Celeritas.logger().warn("Missing Celeritas logo at {}", CELERITAS_LOGO);
+                return null;
+            }
+            BufferedImage image = ImageIO.read(in);
+            if (image == null) {
+                Celeritas.logger().warn("Could not decode the Celeritas logo at {}", CELERITAS_LOGO);
+                return null;
+            }
+            Identifier id = new Identifier("celeritas", "textures/gui/logo.png");
+            Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(image));
+            return id.toString();
+        } catch (IOException e) {
+            Celeritas.logger().warn("Could not load the Celeritas logo", e);
+            return null;
+        }
     }
 
     @Override
