@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.taumc.celeritas.mixin",
+  "compatibilityLevel": "JAVA_13",
+  "client": [
+    "core.ChunkCacheMixin",
+    "core.ClientChunkCacheAccessor",
+    "core.DebugOverlayMixin",
+    "core.FrustumCullerMixin",
+    "core.FrustumMixin",
+    "core.GameRendererMixin",
+    "core.MinecraftMixin",
+    "core.MultiplayerChunkCacheMixin",
+    "core.TessellatorAccessor",
+    "core.TypeInstanceMultimapMixin",
+    "core.WorldChunkAccessor",
+    "core.WorldMixin",
+    "core.WorldRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
