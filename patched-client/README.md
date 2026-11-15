@@ -53,9 +53,10 @@ are build-time dependencies only; the patcher filters them out of the output.
 - Drops `META-INF/*.SF`, `*.RSA`, `*.DSA`, `*.EC` and `Sealed:` lines, and emits
   deterministic entry timestamps.
 
-fastutil is bundled into `client.jar`: 1.8.9 Celeritas needs it, and Tessera's
-installer does not download it as a separate library. The patch therefore grows
-by the fastutil jar, but the resulting client is self-contained on that front.
+fastutil is provided by Tessera: its installer adds the same
+`it.unimi.dsi:fastutil:8.5.18` artifact that modern version indexes already list.
+The patched client itself stays small; fastutil is a normal library on the game
+class path.
 
 ## AOT
 

@@ -45,9 +45,6 @@ dependencies {
     implementation("org.ow2.asm:asm-analysis:9.8")
     implementation("org.ow2.asm:asm-commons:9.8")
     implementation("org.ow2.asm:asm-util:9.8")
-    // Bundled into the patched client: 1.8.9 Celeritas needs fastutil, and
-    // Tessera does not download it as a separate library.
-    implementation("it.unimi.dsi:fastutil:8.5.18")
 }
 
 java {
@@ -157,9 +154,6 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
         val mixinExtras = configurations.runtimeClasspath.get().files
             .firstOrNull { it.name.startsWith("mixinextras") }
             ?: throw GradleException("MixinExtras is missing from the patcher classpath")
-        val fastutil = configurations.runtimeClasspath.get().files
-            .firstOrNull { it.name.startsWith("fastutil-") }
-            ?: throw GradleException("fastutil is missing from the patcher classpath")
         val libraries = libraryJars.files.filter { it.isFile }.sortedBy { it.name }
         classpath = files(
             sourceSets.main.get().output,
@@ -174,8 +168,7 @@ val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
             clientBaseOut.get().asFile.absolutePath,
             celeritasJar.get().absolutePath,
             shimJar.absolutePath,
-            mixinExtras.absolutePath,
-            fastutil.absolutePath
+            mixinExtras.absolutePath
         ) + libraries.map { it.absolutePath }
         jvmArgs("-Xmx2g")
     }
