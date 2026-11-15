@@ -8,5 +8,5 @@ package org.taumc.celeritas.impl;
  */
 public class Celeritas {
     public static final String MODID = "celeritas";
-    public static final String VERSION = "2.5.0-agent";
+    public static final String VERSION = "2.5.0-patch";
 }

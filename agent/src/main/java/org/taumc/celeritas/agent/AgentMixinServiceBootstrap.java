@@ -6,7 +6,7 @@ import org.spongepowered.asm.service.IMixinServiceBootstrap;
 public final class AgentMixinServiceBootstrap implements IMixinServiceBootstrap {
     @Override
     public String getName() {
-        return "celeritas-agent";
+        return "celeritas-patcher";
     }
 
     @Override

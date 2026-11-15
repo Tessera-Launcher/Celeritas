@@ -1,8 +1,9 @@
-# Celeritas 1.8.9 agent
+# Celeritas 1.8.9 patched client
 
-One Java agent that applies Celeritas' 1.8.9 mixins and Tessera's LWJGL3
-shim/rewriter.  The transformer order is fixed: Celeritas first, LWJGL3 second,
-so calls Celeritas injects are rewritten too.
+Builds a **patched `client.jar`**, not a Java agent. Celeritas' 1.8.9 mixins and
+Tessera's LWJGL3 shim/rewriter are applied to the decompressed Minecraft
+classes at build time; the output has no `Premain-Class`, no Mixin and no ASM on
+its runtime class path.
 
 ## Build
 
@@ -10,74 +11,69 @@ so calls Celeritas injects are rewritten too.
 # 1. the ordinary Celeritas jar (Ornithe intermediary namespace)
 ./gradlew :ornithe:1.8.9:packageJar -Pceleritas_target_versions=1.8.9
 
-# 2. remap it to Mojang official names for Tessera's normal client jar
+# 2. remap it to Mojang official names for the vanilla client jar
 ./agent/remap-official.sh
 
-# 3. the one agent jar
-./gradlew :agent:jar -Pceleritas_target_versions=1.8.9 \
-  -PceleritasAgentJar=agent/build/celeritas-official.jar
+# 3. download the official 1.8.9 client + libraries, then build the patched jar
+./gradlew :agent:patchClientJar -Pceleritas_target_versions=1.8.9
 ```
 
-The result is `agent/build/libs/celeritas-agent.jar`.
+Step 3 fetches `version_manifest_v2.json`, the 1.8.9 version JSON, its
+`client.jar` and library artifacts from Mojang into `agent/build/base/`, verifies
+their SHA-1, strips signatures/`Sealed:` from the client jar exactly like
+Tessera's installer, and writes:
 
-fastutil is **not** bundled: it is about 23 MB and every launcher that can run
-1.8.9 already has it (or can add it).  It must be on the game classpath; the
-agent checks for `it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap` and fails
-with a clear message if it is missing.
-
-To build an agent for the Ornithe intermediary client jar instead, omit
-`-PceleritasAgentJar`; the default input is the intermediary Celeritas jar.
-
-## Run
-
-```sh
-./agent/run-test.sh
+```text
+agent/build/libs/client.jar
 ```
 
-`TESSERA_DATA` defaults to `/home/ygbs/桌面/Tessera/target/debug/data`;
-override it if the test install lives elsewhere.
+The output must precede the ordinary game libraries on the class path: a few
+third-party classes that call LWJGL2 (currently paulscode's OpenAL wrapper) are
+rewritten and copied into the jar so they win over the original library jars.
+`agent/run-test.sh` does this and launches without `-javaagent`.
+
+`-PceleritasJar=...` overrides the remapped input jar. Mixin, MixinExtras and ASM
+are build-time dependencies only; the patcher filters them out of the output.
 
 ## What it does
 
-- `CeleritasAgent.premain` initializes a standalone Mixin service
-  (`META-INF/services/org.spongepowered.asm.service.IMixinService`), adds
-  `mixins.celeritas.agent.json`, and registers a `ClassFileTransformer`.
-- The active Mixin transformer is installed before `MixinExtrasBootstrap.init()`
-  so MixinExtras can register its extensions.
-- Tessera's `TesseraLwjgl3Agent.premain` runs afterwards from the same jar.
-- `mixins.celeritas.agent.json` lists only the mixins that exist for 1.8.9;
-  `InGameHudMixin`, `BlockRendererMixin`, `MinecraftAppletMixin` and
-  `TessellatorMixin` are compiled out for this target.
+- Applies `mixins.celeritas.client.json` to the vanilla classes with Mixin.
+- Runs Tessera's LWJGL3 rewriter over the patched game classes, Celeritas'
+  classes, and library classes that still use LWJGL2.
+- Replaces Mixin's `CallbackInfo`/`CallbackInfoReturnable` references with the
+  tiny `org.taumc.celeritas.patch` shims, so the result needs no Mixin runtime.
+- Merges Celeritas, Tessera's LWJGL3 shim, MixinExtras' runtime and the generated
+  `@Local` implementations.
+- Drops `META-INF/*.SF`, `*.RSA`, `*.DSA`, `*.EC` and `Sealed:` lines, and emits
+  deterministic entry timestamps.
 
-## AOT caveat
+fastutil is **not** bundled: it is about 23 MB and every 1.8.9 installation
+already has it. It must be on the game class path; `run-test.sh` adds it.
 
-A Java agent that transforms classes cannot have those classes in the AOT
-cache.  The 1.8.9 agent currently transforms seven Minecraft classes
-(`Minecraft`, `WorldRenderer`, `World`, `Frustum`, `Tessellator`, `GameRenderer`
-and the chunk-cache classes).  Celeritas' own classes are not transformed and
-remain cacheable.  For a fully AOT-cacheable build, use this agent as a
-generator: dump the transformed bytes and patch the client jar, then run
-without the agent.
+## AOT
+
+The jar is patched before launch, so no class is transformed at runtime. The
+result is eligible for Tessera's 1.8.9 AOT cache, unlike the old agent-based
+target.
 
 ## Test result
 
-Launched against `Tessera/target/debug/data/游戏/versions/1.8.9/1.8.9.jar` on
-Java 28 EA:
+Launched against Tessera's 1.8.9 `mdtLwjgl3` installation on Java 28 EA without
+an agent:
 
 ```
 LWJGL Version: 2.9.4 (LWJGL3 shim)
 [tessera-lwjgl3] Display.create ok 854x480
+OpenAL initialized.
 Sound engine started
 Created: 512x512 textures-atlas
 ```
 
-Seven target classes were exported by Mixin under `.mixin.out`, including the
-official `bfr` (`WorldRenderer`) with the `CeleritasWorldRenderer` field and
-`ave` (`Minecraft`) with the `MinecraftAccessor` interface.  No Mixin apply
-errors and no `NoSuchMethodError` from Celeritas' LWJGL2 calls.
+F3 shows `Celeritas Renderer (2.5.0-patch)`.
 
 ## Licensing
 
-The agent code in this directory is part of Celeritas (LGPL-3.0).  It embeds
-Tessera's `lwjgl3-agent.jar`, which is GPL-3.0-or-later; the combined agent is
-distributed under GPL-3.0-or-later.  Celeritas' own classes remain LGPL-3.0.
+The patcher and shim code in this directory are part of Celeritas (LGPL-3.0).
+The generated client.jar embeds Tessera's `lwjgl3-agent.jar`, which is
+GPL-3.0-or-later; the combined jar is distributed under GPL-3.0-or-later.
+Celeritas' own classes remain LGPL-3.0.

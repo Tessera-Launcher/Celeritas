@@ -189,7 +189,7 @@ if (includedProjectCount == 0) {
     println("WARNING: No projects were selected. Set celeritas_target_versions or celeritas_target_versions_pattern to target specific versions.")
 }
 
-// The standalone 1.8.9 agent: Celeritas mixins + Tessera's LWJGL3 shim in one jar.
+// The standalone 1.8.9 patched client: Celeritas mixins + Tessera's LWJGL3 shim applied to client.jar.
 if (file("agent").exists() && isVersionIncluded("1.8.9")) {
     include("agent")
     includedProjectCount++

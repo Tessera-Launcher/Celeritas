@@ -1,6 +1,6 @@
 #!/bin/bash
 # Remap the built 1.8.9 Celeritas jar from Ornithe intermediary to Mojang
-# official names, so the agent can target Tessera's ordinary 1.8.9 client jar.
+# official names, so the patcher can target Tessera's ordinary 1.8.9 client jar.
 #
 # Run  ./gradlew :ornithe:1.8.9:packageJar -Pceleritas_target_versions=1.8.9
 # first, then this script.  The result is agent/build/celeritas-official.jar.

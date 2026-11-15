@@ -6,7 +6,7 @@ import org.spongepowered.asm.service.IMixinAuditTrail;
 
 /** Audit output is useful when a mixin silently refuses to apply. */
 final class AgentAuditTrail implements IMixinAuditTrail {
-    private static final Logger LOG = Logger.getLogger("celeritas-agent");
+    private static final Logger LOG = Logger.getLogger("celeritas-patcher");
 
     @Override
     public void onApply(String className, String mixinName) {

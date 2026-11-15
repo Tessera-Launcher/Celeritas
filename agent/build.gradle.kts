@@ -1,5 +1,10 @@
-import org.gradle.api.file.DuplicatesStrategy
+import groovy.json.JsonSlurper
 import org.gradle.jvm.tasks.Jar
+
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 
 plugins {
     java
@@ -9,12 +14,14 @@ group = "org.taumc.celeritas"
 version = rootProject.version
 
 val mcVersion = "1.8.9"
-val officialJar = file("build/celeritas-official.jar")
-val celeritasJar = providers.gradleProperty("celeritasAgentJar").orNull
-    ?.let { rootProject.file(it) }
-    ?: (if (officialJar.exists()) officialJar
-        else file("../build/libs/${rootProject.version}/celeritas-fabriclike-mc8.9-${rootProject.version}.jar"))
-val lwjgl3AgentJar = layout.projectDirectory.file("libs/lwjgl3-agent.jar")
+val baseDir = layout.buildDirectory.dir("base")
+val clientJar = baseDir.map { it.file("client.jar") }
+val librariesDir = baseDir.map { it.dir("libraries") }
+val clientOut = layout.buildDirectory.file("libs/client.jar")
+val lwjgl3Jar = layout.projectDirectory.file("libs/lwjgl3-agent.jar").asFile
+val celeritasJar = providers.gradleProperty("celeritasJar")
+    .map { file(it) }
+    .orElse(provider { file("build/celeritas-official.jar") })
 
 repositories {
     mavenCentral()
@@ -23,6 +30,8 @@ repositories {
 }
 
 dependencies {
+    // Build-time only: Mixin, MixinExtras and ASM apply the patches. None of
+    // them are merged into the output client.jar.
     implementation("net.fabricmc:sponge-mixin:0.17.5+mixin.0.8.7")
     implementation("io.github.llamalad7:mixinextras-fabric:0.5.5")
     implementation("org.ow2.asm:asm:9.8")
@@ -30,56 +39,140 @@ dependencies {
     implementation("org.ow2.asm:asm-analysis:9.8")
     implementation("org.ow2.asm:asm-commons:9.8")
     implementation("org.ow2.asm:asm-util:9.8")
-    // fastutil is deliberately not bundled: it is a 23 MB library and the
-    // launcher already has it (or can add it).  It is requested from the
-    // launch classpath instead.
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
-tasks.named<Jar>("jar") {
-    archiveFileName = "celeritas-agent.jar"
-
-    // Celeritas itself (intermediary names; this agent targets the Ornithe
-    // intermediary client jar for the first bring-up).
-    from(zipTree(celeritasJar)) {
-        exclude("META-INF/MANIFEST.MF", "fabric.mod.json", "mixins.celeritas.json")
+fun sha1(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-1")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+        }
     }
-    // Tessera's LWJGL3 shim and rewriter. Drop its bundled ASM so the agent
-    // uses one ASM version; drop its manifest.
-    from(zipTree(lwjgl3AgentJar)) {
-        exclude("META-INF/MANIFEST.MF")
-        exclude("org/objectweb/asm/**")
-        exclude("META-INF/maven/**")
-    }
-    // Runtime libraries. Service files are provided by this project; Mixin's
-    // built-in Fabric/ModLauncher service entries must not win.
-    val runtimeJars = configurations.runtimeClasspath.get().files
-    from(runtimeJars.map { zipTree(it) }) {
-        exclude("META-INF/MANIFEST.MF")
-        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
-        exclude("META-INF/services/org.spongepowered.asm.service.IMixinService")
-        exclude("META-INF/services/org.spongepowered.asm.service.IMixinServiceBootstrap")
-        exclude("META-INF/services/org.spongepowered.asm.service.IGlobalPropertyService")
-        exclude("META-INF/services/cpw.mods.**")
-        exclude("META-INF/services/javax.annotation.processing.Processor")
-        exclude("META-INF/services/org.spongepowered.tools.**")
-        exclude("module-info.class")
-    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
 
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+fun download(url: String, target: File, expectedSha1: String?) {
+    if (expectedSha1 != null && target.isFile && sha1(target).equals(expectedSha1, ignoreCase = true)) {
+        return
+    }
+    target.parentFile?.mkdirs()
+    val tmp = File(target.parentFile, target.name + ".tmp")
+    val connection = URI(url).toURL().openConnection()
+    connection.setRequestProperty("User-Agent", "celeritas-build")
+    connection.getInputStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+    if (expectedSha1 != null) {
+        val actual = sha1(tmp)
+        if (!actual.equals(expectedSha1, ignoreCase = true)) {
+            tmp.delete()
+            throw GradleException("checksum mismatch for $url: expected $expectedSha1, got $actual")
+        }
+    }
+    Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+}
 
-    manifest {
-        attributes(
-            "Premain-Class" to "org.taumc.celeritas.agent.CeleritasAgent",
-            "Can-Retransform-Classes" to "true",
-            "Can-Redefine-Classes" to "false",
-            "Implementation-Title" to "Celeritas 1.8.9 Agent",
-            "Implementation-Version" to project.version.toString()
+val downloadInputs = tasks.register("downloadInputs") {
+    description = "Download the 1.8.9 client jar and libraries used by the patcher"
+    group = "build"
+    outputs.dir(baseDir)
+    outputs.upToDateWhen { false }
+    notCompatibleWithConfigurationCache("downloads the 1.8.9 inputs and verifies them")
+    doLast {
+        @Suppress("UNCHECKED_CAST")
+        fun map(value: Any?): Map<String, Any?> = value as Map<String, Any?>
+
+        @Suppress("UNCHECKED_CAST")
+        fun list(value: Any?): List<Any?> = value as List<Any?>
+
+        val manifestUrl = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+        val manifest = map(JsonSlurper().parse(URI(manifestUrl).toURL()))
+        val entry = list(manifest["versions"])
+            .map(::map)
+            .firstOrNull { it["id"] == mcVersion }
+            ?: throw GradleException("Mojang's version manifest has no $mcVersion")
+        val version = map(JsonSlurper().parse(URI(entry["url"] as String).toURL()))
+        val downloads = map(version["downloads"])
+
+        val client = map(downloads["client"])
+        download(
+            client["url"] as String,
+            clientJar.get().asFile,
+            client["sha1"] as? String
         )
+        println("client: ${clientJar.get().asFile}")
+
+        for (raw in list(version["libraries"])) {
+            val library = map(raw)
+            val artifact = map(library["downloads"] ?: continue)["artifact"] ?: continue
+            val fileInfo = map(artifact)
+            val path = fileInfo["path"] as? String ?: continue
+            val url = fileInfo["url"] as? String ?: continue
+            download(url, librariesDir.get().dir(path).asFile, fileInfo["sha1"] as? String)
+        }
+        println("libraries: ${librariesDir.get().asFile}")
     }
+}
+
+val libraryJars = fileTree(librariesDir) { include("**/*.jar") }
+
+/**
+ * Applies Celeritas' mixins and Tessera's LWJGL3 rewrite directly to the
+ * downloaded client jar. The result has no agent manifest and no Mixin/ASM
+ * classes; it is the client jar a launcher should put on the class path.
+ */
+val patchClientJar = tasks.register<JavaExec>("patchClientJar") {
+    description = "Build a client.jar with Celeritas and the LWJGL3 shim applied"
+    group = "build"
+    dependsOn(downloadInputs, tasks.named("classes"))
+    mainClass.set("org.taumc.celeritas.agent.OfflinePatcher")
+    outputs.file(clientOut)
+    inputs.files(celeritasJar, clientJar, libraryJars)
+    notCompatibleWithConfigurationCache("runs the offline patcher with a downloaded class path")
+
+    doFirst {
+        if (!celeritasJar.get().isFile) {
+            throw GradleException(
+                "missing ${celeritasJar.get()}; build :ornithe:$mcVersion:packageJar " +
+                    "and run agent/remap-official.sh first (or pass -PceleritasJar=...)"
+            )
+        }
+        val mixinExtras = configurations.runtimeClasspath.get().files
+            .firstOrNull { it.name.startsWith("mixinextras") }
+            ?: throw GradleException("MixinExtras is missing from the patcher classpath")
+        val libraries = libraryJars.files.filter { it.isFile }.sortedBy { it.name }
+        classpath = files(
+            sourceSets.main.get().output,
+            configurations.runtimeClasspath,
+            celeritasJar.get(),
+            lwjgl3Jar,
+            clientJar.get().asFile,
+            libraries
+        )
+        args = listOf(
+            clientJar.get().asFile.absolutePath,
+            clientOut.get().asFile.absolutePath,
+            celeritasJar.get().absolutePath,
+            lwjgl3Jar.absolutePath,
+            mixinExtras.absolutePath
+        ) + libraries.map { it.absolutePath }
+        jvmArgs("-Xmx2g")
+    }
+}
+
+tasks.named("assemble") {
+    dependsOn(patchClientJar)
+}
+
+// The old target packaged a -javaagent jar. Only the patched client is built
+// now, so the default jar task must not produce a second, misleading artifact.
+tasks.named<Jar>("jar") {
+    enabled = false
 }

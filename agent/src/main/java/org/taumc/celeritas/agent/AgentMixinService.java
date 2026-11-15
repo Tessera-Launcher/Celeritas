@@ -27,7 +27,7 @@ public final class AgentMixinService extends MixinServiceAbstract {
 
     @Override
     public String getName() {
-        return "celeritas-agent";
+        return "celeritas-patcher";
     }
 
     @Override
