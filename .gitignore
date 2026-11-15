@@ -50,3 +50,6 @@ bin/
 
 # Rust patch tool build output
 /patch-tool/target/
+
+# Runtime game config created when testing from the repo root
+/config/

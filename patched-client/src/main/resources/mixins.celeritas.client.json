@@ -16,7 +16,8 @@
     "core.TypeInstanceMultimapMixin",
     "core.WorldChunkAccessor",
     "core.WorldMixin",
-    "core.WorldRendererMixin"
+    "core.WorldRendererMixin",
+    "core.MinecraftVideoOptionsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

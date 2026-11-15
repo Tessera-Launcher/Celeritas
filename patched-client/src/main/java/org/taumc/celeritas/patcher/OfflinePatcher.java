@@ -81,6 +81,8 @@ public final class OfflinePatcher {
             }
         }
 
+        String celeritasLang = readEntry(celeritas, "assets/celeritas/lang/en_US.lang");
+
         MixinBootstrap.init();
         MixinBootstrap.getPlatform().inject();
         MixinBridge.install();
@@ -121,7 +123,12 @@ public final class OfflinePatcher {
                         ? unsealed(new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8)
                         : bytes;
                 writeBase(baseOut, baseWritten, name, baseBytes);
-                if (name.equalsIgnoreCase("META-INF/MANIFEST.MF")) {
+                // The standalone client has no mod loader to inject a mod language
+                // pack, so merge our keys into vanilla's en_US table.
+                if (name.equals("assets/minecraft/lang/en_US.lang") && celeritasLang != null) {
+                    bytes = mergeLang(new String(bytes, StandardCharsets.UTF_8), celeritasLang)
+                            .getBytes(StandardCharsets.UTF_8);
+                } else if (name.equalsIgnoreCase("META-INF/MANIFEST.MF")) {
                     bytes = patchedManifest(new String(bytes, StandardCharsets.UTF_8))
                             .getBytes(StandardCharsets.UTF_8);
                 } else if (name.endsWith(".class")) {
@@ -393,6 +400,37 @@ public final class OfflinePatcher {
         String upper = name.toUpperCase(Locale.ROOT);
         return upper.startsWith("META-INF/") && (upper.endsWith(".SF") || upper.endsWith(".RSA")
                 || upper.endsWith(".DSA") || upper.endsWith(".EC"));
+    }
+
+    private static String readEntry(Path jar, String entryName) throws IOException {
+        try (ZipFile zip = new ZipFile(jar.toFile())) {
+            ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            try (InputStream in = zip.getInputStream(entry)) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+    }
+
+    private static String mergeLang(String vanilla, String extra) {
+        if (extra == null || extra.isEmpty()) {
+            return vanilla;
+        }
+        String keys = extra.startsWith("#PARSE_ESCAPES\n")
+                ? extra.substring("#PARSE_ESCAPES\n".length())
+                : extra;
+        StringBuilder out = new StringBuilder(vanilla.length() + keys.length() + 1);
+        out.append(vanilla);
+        if (!vanilla.isEmpty() && !vanilla.endsWith("\n")) {
+            out.append('\n');
+        }
+        out.append(keys);
+        if (!keys.endsWith("\n")) {
+            out.append('\n');
+        }
+        return out.toString();
     }
 
     /**

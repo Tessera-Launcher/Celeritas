@@ -19,6 +19,7 @@ import org.embeddedt.embeddium.impl.render.chunk.vertex.format.ChunkVertexType;
 import org.embeddedt.embeddium.impl.render.viewport.Viewport;
 import org.embeddedt.embeddium.impl.util.position.SectionPos;
 import org.jetbrains.annotations.Nullable;
+import org.taumc.celeritas.impl.Celeritas;
 import org.taumc.celeritas.impl.render.terrain.fog.GLStateManagerFogService;
 import org.taumc.celeritas.impl.render.terrain.compile.PrimitiveBuiltRenderSectionData;
 import org.taumc.celeritas.impl.render.terrain.compile.PrimitiveChunkBuildContext;
@@ -37,11 +38,10 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
     }
 
     public static PrimitiveRenderSectionManager create(ChunkVertexType vertexType, World world, int renderDistance, CommandList commandList) {
-        // TODO support thread option
         //? if <1.8 {
         int idealThreadCount = -1;
         //?} else
-        //int idealThreadCount = 0;
+        //int idealThreadCount = Celeritas.options().performance.chunkBuilderThreads;
         //? if <1.2 {
         //int maxSection = 8;
         //?} else
@@ -53,7 +53,10 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
 
     @Override
     protected AsyncOcclusionMode getAsyncOcclusionMode() {
-        return AsyncOcclusionMode.EVERYTHING;
+        //? if >=1.8 {
+        return Celeritas.options().performance.asyncOcclusionMode;
+        //?} else
+        //return AsyncOcclusionMode.EVERYTHING;
     }
 
     @Override
@@ -63,7 +66,10 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
 
     @Override
     protected boolean useRasterOcclusionCulling() {
-        return false;
+        //? if >=1.8 {
+        return Celeritas.options().performance.useRasterOcclusionCulling;
+        //?} else
+        //return false;
     }
 
     @Override
@@ -73,7 +79,10 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
 
     @Override
     protected boolean useFogOcclusion() {
-        return true;
+        //? if >=1.8 {
+        return Celeritas.options().performance.useFogOcclusion;
+        //?} else
+        //return true;
     }
 
     @Override
