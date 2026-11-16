@@ -54,6 +54,12 @@ Two things bite when splicing another mod into the patch, both already handled f
   patcher fails the build if a reference would be left dangling. Do not go back to copying the whole
   runtime.
 - Never run `taugradle_publish`, because it publishes artifacts.
+- Releasing: bump `Celeritas.VERSION` (that is what F3 shows), run
+  `./gradlew :patched-client:assemble`, commit, push, then publish with
+  `gh release create v<version>-<mc> --title "Celeritas <version> for Minecraft 1.8.9"
+  --notes-file ... --target <sha>` and upload `celeritas-1.8.9-<version>.tpatch` plus its
+  `.sha256`. Finally update `ReleasesIndex.toml` (version/tag/url/sha256/size must match the
+  uploaded asset; URLs must be `https://github.com/.../releases/download/...`).
 
 ## Licensing
 

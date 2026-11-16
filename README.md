@@ -34,6 +34,23 @@ patched-client/build/libs/
 | Embeddium / Sodium | <https://github.com/embeddedt/Embeddium> | Celeritas 的模组血统（Sodium 0.5.11- 的最后 FOSS 版本） |
 | Tessera | — | 提供 1.8.9 运行环境（LWJGL3 shim、AOT cache 等） |
 
+## 发布索引
+
+根目录的 **`ReleasesIndex.toml`** 是给启动器读的机器可读索引，记录最新一版的信息：
+
+```toml
+[latest]
+version = "2.5.0p-patch5"
+tag = "v2.5.0p-patch5-1.8.9"
+
+[latest.asset]
+url = "https://github.com/Tessera-Launcher/Celeritas/releases/download/v2.5.0p-patch5-1.8.9/celeritas-1.8.9-2.5.0p-patch5.tpatch"
+sha256 = "bdf8175f60f07804ce8765ae3f1480677c8a27fd33464c94c28c31fee4a05e78"
+size = 1947202
+```
+
+下载地址一律用 `https://github.com/<owner>/<repo>/releases/download/<tag>/<file>` 形式。
+
 ## 运行要求
 
 - **不需要模组加载器**：不装任何模组、也没有 Mixin/ASM/agent；`client.jar` 直接放在 classpath

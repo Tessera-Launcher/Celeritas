@@ -1,0 +1,32 @@
+# Celeritas 发布索引（供启动器读取）
+#
+# 发布新版本时，只需更新 [latest] 及它的子表；version / tag / 资产文件名三者一一对应。
+#
+# 下载地址必须使用 github.com 的 release 资产地址
+#   https://github.com/<owner>/<repo>/releases/download/<tag>/<file>
+# 不要用 raw.githubusercontent.com 之类：它们读不到 release 资产，也不是本项目的分发方式。
+
+format = 1
+minecraft = "1.8.9"
+updated = "2026-11-16"
+
+[latest]
+version = "2.5.0p-patch5"
+tag = "v2.5.0p-patch5-1.8.9"
+page = "https://github.com/Tessera-Launcher/Celeritas/releases/tag/v2.5.0p-patch5-1.8.9"
+summary = "Phosphor 光照引擎并入；构建不再依赖 Loom/模组工程；产物重新可复现。"
+
+[latest.asset]
+name = "celeritas-1.8.9-2.5.0p-patch5.tpatch"
+url = "https://github.com/Tessera-Launcher/Celeritas/releases/download/v2.5.0p-patch5-1.8.9/celeritas-1.8.9-2.5.0p-patch5.tpatch"
+sha256 = "bdf8175f60f07804ce8765ae3f1480677c8a27fd33464c94c28c31fee4a05e78"
+size = 1947202
+sha256_url = "https://github.com/Tessera-Launcher/Celeritas/releases/download/v2.5.0p-patch5-1.8.9/celeritas-1.8.9-2.5.0p-patch5.tpatch.sha256"
+
+# 补丁自身声明的元数据，与 .tpatch 内的 patch.toml 保持一致。
+[latest.patch]
+format = 1
+canonicalization = 1
+base = "normalized Mojang 1.8.9 client.jar"
+base_entries_sha256 = "6cf5165f99aea57207f5d14579e013884ad6fe8827204cfbbbf71480031107f9"
+target_client_sha256 = "c717260b6e58e2007025cb5bccdaf55f5fa822a914b296812cee8920937809fd"
