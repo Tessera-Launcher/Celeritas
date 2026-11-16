@@ -1,12 +1,13 @@
 #!/bin/bash
 # Launch the statically patched 1.8.9 client: no -javaagent, no Mixin, no ASM.
+# TESSERA_DATA / RUNDIR / JAVA can be overridden from the environment.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 TESSERA_DATA="${TESSERA_DATA:-/home/ygbs/桌面/Tessera/target/debug/data}"
 GAME="$TESSERA_DATA/游戏"
 VERS="$GAME/versions/1.8.9"
-JAVA="$TESSERA_DATA/依赖/java/28+24-ea-beta/bin/java"
+JAVA="${JAVA:-$TESSERA_DATA/依赖/java/28+24-ea-beta/bin/java}"
 CLIENT="$(pwd)/patched-client/build/libs/client.jar"
 RUNDIR="${RUNDIR:-/tmp/celeritas-run}"
 mkdir -p "$RUNDIR"
