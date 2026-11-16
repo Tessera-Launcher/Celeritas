@@ -16,6 +16,8 @@ version = rootProject.version
 val mcVersion = "1.8.9"
 // Ornithe's Feather mappings for the names the Celeritas sources are written in.
 val featherVersion = "1.8.9+build.28"
+// Legacy Fabric's mappings, for the Phosphor sources (they are written in Yarn).
+val legacyYarnVersion = "1.8.9+build.576"
 
 val baseDir = layout.buildDirectory.dir("base")
 val clientJar = baseDir.map { it.file("client.jar") }
@@ -29,6 +31,12 @@ val clientNamed = workspace.map { it.file("client-named.jar") }
 val celeritasClasses = workspace.map { it.file("celeritas-classes.jar") }
 val celeritasIntermediary = workspace.map { it.file("celeritas-intermediary.jar") }
 val celeritasOfficialClasses = workspace.map { it.file("celeritas-official-classes.jar") }
+// Phosphor is written against Legacy Fabric's Yarn names, so it gets its own chain.
+val clientLegacyIntermediary = workspace.map { it.file("client-legacy-intermediary.jar") }
+val clientYarn = workspace.map { it.file("client-yarn.jar") }
+val phosphorClasses = workspace.map { it.file("phosphor-classes.jar") }
+val phosphorIntermediary = workspace.map { it.file("phosphor-intermediary.jar") }
+val phosphorOfficialClasses = workspace.map { it.file("phosphor-official-classes.jar") }
 
 val clientOut = layout.buildDirectory.file("libs/client.jar")
 val clientBaseOut = layout.buildDirectory.file("libs/client-base.jar")
@@ -47,6 +55,7 @@ repositories {
     maven("https://repo.spongepowered.org/maven/")
     maven("https://maven.ornithemc.net/releases")
     maven("https://maven.cloverclient.com/releases")
+    maven("https://maven.legacyfabric.net/")
 }
 
 // The two mapping halves that make up Feather's official/intermediary/named chain.
@@ -64,6 +73,8 @@ val celeritasShaded: Configuration by configurations.creating {
 sourceSets {
     // The Celeritas mod code, compiled straight against a named Minecraft jar.
     create("celeritas")
+    // Phosphor's lighting engine, compiled against a Yarn-named client jar.
+    create("phosphor")
 }
 
 dependencies {
@@ -82,6 +93,8 @@ dependencies {
 
     mappings("net.ornithemc:calamus-intermediary:$mcVersion:v2")
     mappings("net.ornithemc:feather:$featherVersion:v2")
+    mappings("net.fabricmc:intermediary:$mcVersion:v2")
+    mappings("net.legacyfabric:yarn:$legacyYarnVersion:v2")
 
     add("celeritasCompileOnly", "net.fabricmc:sponge-mixin:0.17.5+mixin.0.8.7")
     add("celeritasCompileOnly", "io.github.llamalad7:mixinextras-fabric:0.5.5")
@@ -98,6 +111,8 @@ dependencies {
 
     add("celeritasShaded", project(":common"))
     add("celeritasShaded", "org.joml:joml:1.10.5")
+
+    add("phosphorCompileOnly", "net.fabricmc:sponge-mixin:0.17.5+mixin.0.8.7")
 }
 
 configurations["celeritasCompileOnly"].extendsFrom(celeritasShaded)
@@ -301,6 +316,74 @@ tasks.named<JavaCompile>("compileCeleritasJava") {
     classpath += libraryJars
 }
 
+val remapClientToLegacyIntermediary = registerRemapTask(
+    name = "remapClientToLegacyIntermediary",
+    description = "Remap the vanilla 1.8.9 client to Legacy Fabric intermediary names",
+    from = "official",
+    to = "intermediary",
+    mappingPrefix = "intermediary",
+    input = clientJar,
+    output = clientLegacyIntermediary,
+    classpath = { libraryJars }
+).also { it.configure { dependsOn(downloadInputs) } }
+
+val remapClientToYarn = registerRemapTask(
+    name = "remapClientToYarn",
+    description = "Remap the 1.8.9 client to the Legacy Fabric Yarn names Phosphor uses",
+    from = "intermediary",
+    to = "named",
+    mappingPrefix = "yarn",
+    input = clientLegacyIntermediary,
+    output = clientYarn,
+    classpath = { libraryJars }
+).also { it.configure { dependsOn(remapClientToLegacyIntermediary) } }
+
+val phosphorClassesJar = tasks.register<Jar>("phosphorClassesJar") {
+    from(sourceSets["phosphor"].output)
+    archiveFileName = "phosphor-classes.jar"
+    destinationDirectory = workspace
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+val remapPhosphorToIntermediary = registerRemapTask(
+    name = "remapPhosphorToIntermediary",
+    description = "Remap the Phosphor classes from Yarn to Legacy Fabric intermediary names",
+    from = "named",
+    to = "intermediary",
+    mappingPrefix = "yarn",
+    input = phosphorClasses,
+    output = phosphorIntermediary,
+    classpath = { files(clientYarn) + sourceSets["phosphor"].compileClasspath + libraryJars }
+).also { it.configure { dependsOn(phosphorClassesJar, remapClientToYarn) } }
+
+val remapPhosphorToOfficial = registerRemapTask(
+    name = "remapPhosphorToOfficial",
+    description = "Remap the Phosphor classes from intermediary to official names",
+    from = "intermediary",
+    to = "official",
+    mappingPrefix = "intermediary",
+    input = phosphorIntermediary,
+    output = phosphorOfficialClasses,
+    classpath = {
+        files(clientLegacyIntermediary) +
+            configurations["phosphorCompileClasspath"] +
+            libraryJars
+    }
+).also { it.configure { dependsOn(remapPhosphorToIntermediary, remapClientToLegacyIntermediary) } }
+
+// The Phosphor sources are Java 8; the bytecode level does not matter here, so
+// it gets the same compiler as the rest of the 1.8.9 code.
+tasks.named<JavaCompile>("compilePhosphorJava") {
+    javaCompiler.set(javaToolchains.compilerFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    })
+    options.encoding = "UTF-8"
+    dependsOn(remapClientToYarn, downloadInputs)
+    classpath += files(clientYarn)
+    classpath += libraryJars
+}
+
 /**
  * The single jar the patcher merges into the client: the Celeritas classes in
  * official names, the shared core, JOML, and the assets (language keys, shaders,
@@ -309,7 +392,7 @@ tasks.named<JavaCompile>("compileCeleritasJava") {
 val celeritasJar = tasks.register<Jar>("celeritasJar") {
     description = "Merge the remapped Celeritas classes with :common and JOML"
     group = "build"
-    dependsOn(remapCeleritasToOfficial)
+    dependsOn(remapCeleritasToOfficial, remapPhosphorToOfficial)
     destinationDirectory = layout.buildDirectory.dir("libs")
     archiveFileName = "celeritas-official.jar"
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -317,6 +400,7 @@ val celeritasJar = tasks.register<Jar>("celeritasJar") {
     isReproducibleFileOrder = true
     notCompatibleWithConfigurationCache("merges the remapped tree with the :common and JOML jars")
     from(celeritasOfficialClasses.map { zipTree(it.asFile) })
+    from(phosphorOfficialClasses.map { zipTree(it.asFile) })
     from(celeritasShaded.elements.map { elements -> elements.map { zipTree(it.asFile) } })
 }
 

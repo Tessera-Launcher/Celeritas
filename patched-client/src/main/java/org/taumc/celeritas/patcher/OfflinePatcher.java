@@ -45,6 +45,7 @@ import java.util.zip.ZipOutputStream;
  */
 public final class OfflinePatcher {
     private static final String MIXIN_CONFIG = "mixins.celeritas.client.json";
+    private static final String PHOSPHOR_MIXIN_CONFIG = "phosphor.mixins.json";
     private static final Set<String> MIXIN_SKIP = Set.of(
             "java/", "javax/", "jdk/", "sun/", "com/sun/", "org/w3c/", "org/xml/",
             "org/spongepowered/", "com/llamalad7/", "org/objectweb/asm/",
@@ -112,6 +113,7 @@ public final class OfflinePatcher {
         MixinBridge.install();
         MixinExtrasBootstrap.init();
         Mixins.addConfiguration(MIXIN_CONFIG);
+        Mixins.addConfiguration(PHOSPHOR_MIXIN_CONFIG);
 
         Path parent = output.toAbsolutePath().getParent();
         Files.createDirectories(parent);
@@ -328,7 +330,8 @@ public final class OfflinePatcher {
                 String name = entry.getName();
                 if (entry.isDirectory() || signature(name) || skipMetadata(name)
                         || name.equals("fabric.mod.json") || name.equals("mixins.celeritas.json")
-                        || name.equals(MIXIN_CONFIG) || skipCeleritasMixin(name)) {
+                        || name.equals(MIXIN_CONFIG) || name.equals(PHOSPHOR_MIXIN_CONFIG)
+                        || skipMixinClasses(name)) {
                     continue;
                 }
                 entries.put(safe(name), zip.getInputStream(entry).readAllBytes());
@@ -582,8 +585,15 @@ public final class OfflinePatcher {
         return normalized;
     }
 
-    private static boolean skipCeleritasMixin(String name) {
-        return name.startsWith("org/taumc/celeritas/mixin/") && !name.endsWith("Accessor.class");
+    /**
+     * Mixin classes are consumed by the patcher and are not part of the patched
+     * client -- except the {@code @Accessor} interfaces, which the Celeritas and
+     * Phosphor code casts to at runtime, so those have to be shipped.
+     */
+    private static boolean skipMixinClasses(String name) {
+        boolean mixin = name.startsWith("org/taumc/celeritas/mixin/")
+                || name.startsWith("me/jellysquid/mods/phosphor/mixins/");
+        return mixin && !name.endsWith("Accessor.class");
     }
 
     private static boolean skipMetadata(String name) {

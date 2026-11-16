@@ -9,12 +9,16 @@ This tree is trimmed down to the one thing it is actually used for: producing th
 (`client.jar`) and the patch that turns a vanilla 1.8.9 client into it (`client.tpatch`). There is no mod-loader jar for
 1.8.9 and no support for any other Minecraft version here.
 
+The patch contains Celeritas (a Sodium 0.5-style renderer, in `:common` + `src/celeritas`) and
+[Phosphor](https://github.com/Grayray75/Phosphor-Legacy) (JellySquid's lighting engine, vendored in `src/phosphor`),
+which is the combination Sodium users expect.
+
 ## Project layout
 
 | Path | Purpose |
 | --- | --- |
 | `common/` | The Minecraft-independent rendering core (`org.embeddedt.embeddium.impl.*`). |
-| `patched-client/` | The 1.8.9 Celeritas sources (`src/celeritas`) plus the build that compiles them against a Feather-named client jar, applies them and Tessera's LWJGL3 shim to the vanilla client, and emits `client.jar` + `client.tpatch`. |
+| `patched-client/` | The 1.8.9 Celeritas sources (`src/celeritas`), the vendored Phosphor lighting engine (`src/phosphor`) and the build that compiles both against remapped client jars, applies them and Tessera's LWJGL3 shim to the vanilla client, and emits `client.jar` + `client.tpatch`. |
 | `patch-tool/` | The Rust generator/applier for the `.tpatch` format. |
 
 The 1.8.9 sources were flattened out of the multi-version [Stonecutter](https://codeberg.org/stonecutter/stonecutter)
@@ -46,7 +50,8 @@ what the client jar expects. There is no agent, no Mixin and no ASM on its runti
 ## License
 
 Celeritas is licensed under the Lesser GNU General Public License version 3, as it only uses code from Oculus/Iris,
-Sodium 0.5.11-, and other FOSS projects. The patcher and shim code in `patched-client/` are part of Celeritas (LGPL-3.0);
+Sodium 0.5.11-, and other FOSS projects. The vendored Phosphor sources are LGPL-3.0-only (its licence ships in the
+patched jar as `LICENSE-phosphor.txt`). The patcher and shim code in `patched-client/` are part of Celeritas (LGPL-3.0);
 the generated `client.jar` also embeds Tessera's LWJGL3 shim, which is GPL-3.0-or-later, so that jar is distributed
 under GPL-3.0-or-later.
 

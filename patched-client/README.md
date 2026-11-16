@@ -1,9 +1,9 @@
 # Celeritas 1.8.9 patched client
 
-Builds a **patched `client.jar`**, not a Java agent. Celeritas' 1.8.9 mixins and
-Tessera's LWJGL3 shim/rewriter are applied to the decompressed Minecraft
-classes at build time; the output has no `Premain-Class`, no Mixin and no ASM on
-its runtime class path.
+Builds a **patched `client.jar`**, not a Java agent. Celeritas' 1.8.9 mixins,
+Phosphor's lighting engine and Tessera's LWJGL3 shim/rewriter are applied to the
+decompressed Minecraft classes at build time; the output has no `Premain-Class`,
+no Mixin and no ASM on its runtime class path.
 
 ## Build
 
@@ -16,14 +16,20 @@ That is the whole pipeline. It
 1. fetches `version_manifest_v2.json`, the 1.8.9 version JSON, its `client.jar`
    and library artifacts from Mojang into `patched-client/build/base/` and
    verifies their SHA-1;
-2. remaps that client from official names to the Feather names the sources are
-   written in (`official -> intermediary -> named`, using Ornithe's
-   `calamus-intermediary` and `feather` mappings) so it can be compiled against;
-3. compiles `patched-client/src/celeritas` (plus `:common`) against it;
+2. remaps that client to the names the sources are written in, so they can be
+   compiled against:
+   - `src/celeritas` is written in Ornithe Feather names, so the client goes
+     `official -> intermediary -> named` with `calamus-intermediary` + `feather`;
+   - `src/phosphor` is written in Legacy Fabric Yarn names, so the client also
+     goes `official -> intermediary -> named` with Legacy Fabric's
+     `intermediary` + `yarn` (a separate chain, both end up at the official
+     client at runtime);
+3. compiles both source sets (`src/phosphor` is vendored upstream code, see
+   `src/phosphor/README.md`), plus `:common`;
 4. remaps the compiled classes back (`named -> intermediary -> official`) with
-   tiny-remapper, including Mixin's annotation strings;
-5. runs the offline patcher, which applies the mixins and the LWJGL3 rewriter
-   and writes the jars below.
+   tiny-remapper, including Mixin's annotation strings and `@Accessor` targets;
+5. runs the offline patcher, which applies both mixin configs and the LWJGL3
+   rewriter, and writes the jars below.
 
 No mod loader, Loom or mod jar is involved: the only thing produced is the
 client jar and its patch.
@@ -43,9 +49,10 @@ runtime classes the patched classes still reference (see below).
 
 ## What it does
 
-- Compiles the Celeritas sources against a Feather-named client jar and remaps
-  the result to official names, so no refmap and no mod loader are needed.
-- Applies `mixins.celeritas.client.json` to the vanilla classes with Mixin.
+- Compiles the Celeritas and Phosphor sources against named client jars and
+  remaps the result to official names, so no refmap and no mod loader are needed.
+- Applies `mixins.celeritas.client.json` (Sodium-style renderer) and
+  `phosphor.mixins.json` (lighting engine) to the vanilla classes with Mixin.
 - Runs Tessera's LWJGL3 rewriter over the patched game classes, Celeritas'
   classes, and library classes that still use LWJGL2.
 - Replaces Mixin's `CallbackInfo`/`CallbackInfoReturnable` references with the
