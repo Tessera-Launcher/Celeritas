@@ -159,7 +159,6 @@ ZIP 容器，内含 `patch.toml` + 内容寻址的 `blobs/<sha256>`：
 - 因此**合并后的 `client.jar` 以 GPL-3.0-or-later 分发**；Celeritas 自身的代码仍是 LGPL-3.0。
 
 本项目**不包含**、也没有计划包含任何 Sodium 0.6+/0.5.12+ 的代码（那些版本不是自由许可）。
-如果对仓库内任何代码的许可证有疑问，请在 Discord 上联系 @embeddedt。
 
 ## 致谢
 
@@ -171,11 +170,3 @@ ZIP 容器，内含 `patch.toml` + 内容寻址的 `blobs/<sha256>`：
 - **grondag**：bitraster（光栅化遮挡剔除）
 - **douira**：半透明排序 v3 所依据的研究
 - **rdh**、Ven、XFactHD、Pepper 以及其他提供思路与代码的人
-
-[![YourKit logo](https://www.yourkit.com/images/yklogo.png)](https://www.yourkit.com/)
-
-YourKit 为开源项目提供创新的智能工具，用于监控和剖析 Java 与 .NET 应用。
-YourKit 是 [YourKit Java Profiler](https://www.yourkit.com/java/profiler/)、
-[YourKit .NET Profiler](https://www.yourkit.com/.net/profiler/) 与
-[YourKit YouMonitor](https://www.yourkit.com/youmonitor/) 的开发者。
-感谢 YourKit 为本人的多个开源 Minecraft 项目提供免费许可。
