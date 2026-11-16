@@ -92,7 +92,7 @@ patched-client/build/libs/
 启动后可以这样确认两个组件都在工作：
 
 - 日志里应出现 `Phosphor lighting engine active (config: config/phosphor-legacy.json)`；
-- F3 里应出现 `Celeritas Renderer (2.5.0-patch4)` 与渲染器统计；
+- F3 里应出现 `Celeritas Renderer (2.5.0p-patch5)` 与渲染器统计；
 - `config/embeddium-options.json`、`config/phosphor-legacy.json` 会被写出。
 
 ## 目录结构
