@@ -1,4 +1,4 @@
-<img src="ornithe/src/main/resources/icon.png" width="128">
+<img src="patched-client/src/celeritas/resources/assets/celeritas/textures/gui/logo.png" width="128">
 
 # Celeritas
 
@@ -14,23 +14,16 @@ This tree is trimmed down to the one thing it is actually used for: producing th
 | Path | Purpose |
 | --- | --- |
 | `common/` | The Minecraft-independent rendering core (`org.embeddedt.embeddium.impl.*`). |
-| `ornithe/` | The 1.8.9 target (Ornithe/Feather mappings, Loom + Pylon). Produces `celeritas-fabriclike-mc8.9-<version>.jar`, the Celeritas classes the patched client embeds. |
-| `patched-client/` | Applies Celeritas' mixins and Tessera's LWJGL3 shim to the vanilla 1.8.9 `client.jar` at build time, and emits `client.jar` + `client.tpatch`. |
+| `patched-client/` | The 1.8.9 Celeritas sources (`src/celeritas`) plus the build that compiles them against a Feather-named client jar, applies them and Tessera's LWJGL3 shim to the vanilla client, and emits `client.jar` + `client.tpatch`. |
 | `patch-tool/` | The Rust generator/applier for the `.tpatch` format. |
 
-`ornithe/src/main` is the resolved 1.8.9 source; the multi-version [Stonecutter](https://codeberg.org/stonecutter/stonecutter)
-machinery was removed together with the other targets.
+The 1.8.9 sources were flattened out of the multi-version [Stonecutter](https://codeberg.org/stonecutter/stonecutter)
+tree, so some files still carry inert `//? if` comment markers. There is no mod jar and no mod loader:
+the only output is the patched client.
 
 ## How to build
 
 ```sh
-# 1. the Celeritas jar (Ornithe intermediary namespace)
-./gradlew :ornithe:packageJar
-
-# 2. remap it to the names the vanilla client uses
-./patched-client/remap-official.sh
-
-# 3. fetch the official 1.8.9 client + libraries and build the patched client
 ./gradlew :patched-client:assemble
 ```
 

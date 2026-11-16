@@ -50,12 +50,10 @@ plugins {
 
 rootProject.name = "celeritas"
 
-// Shared, Minecraft-independent rendering core. The 1.8.9 target shades it in.
+// Shared, Minecraft-independent rendering core. The patched client embeds it.
 include("common")
 
-// The Celeritas classes the patched client embeds.
-include("ornithe")
-
-// Applies those classes plus Tessera's LWJGL3 shim to the vanilla 1.8.9 client
-// and produces client.jar / client.tpatch.
+// Compiles the Celeritas 1.8.9 sources against a named client jar, applies them
+// plus Tessera's LWJGL3 shim to the vanilla client, and produces client.jar /
+// client.tpatch.
 include("patched-client")

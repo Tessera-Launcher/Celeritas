@@ -17,7 +17,7 @@ tau.publishing.publish {
 
         webhookURL = providers.environmentVariable("DISCORD_WEBHOOK")
         username = "Celeritas Test Builds"
-        avatarURL = "https://git.taumc.org/embeddedt/celeritas/raw/branch/stonecutter/ornithe/src/main/resources/icon.png"
+        avatarURL = "https://git.taumc.org/embeddedt/celeritas/raw/branch/stonecutter/patched-client/src/celeritas/resources/assets/celeritas/textures/gui/logo.png"
 
         testBuildPreset("Celeritas", "https://git.taumc.org/embeddedt/celeritas")
     }

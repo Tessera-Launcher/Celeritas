@@ -26,9 +26,9 @@ jobs:
             21
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4.4.4
-      - name: Build the 1.8.9 jar
-        run: ./gradlew :ornithe:packageJar --info --stacktrace
+      - name: Build the patched 1.8.9 client
+        run: ./gradlew :patched-client:assemble --info --stacktrace
       - name: Run common tests
         run: ./gradlew :common:test --stacktrace
       - name: Show checksums
-        run: find build/libs -name \*.jar | sort | xargs sha256sum
+        run: sha256sum patched-client/build/libs/client.jar patched-client/build/libs/client.tpatch
