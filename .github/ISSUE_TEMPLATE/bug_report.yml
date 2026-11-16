@@ -10,13 +10,10 @@ body:
         <br><br>
         Additionally, please make sure you have done the following:
 
-        - **Are you playing on a modern version of Minecraft?** We currently support 1.20.1 and 1.21.1. Older versions are no longer supported.
+        - **Are you running the patched 1.8.9 client?** That is the only supported target in this tree.
         
-        - **Have you ensured that all of your mods (including Embeddium) are up-to-date?** The latest version of Embeddium
-        can always be found [on Modrinth](https://modrinth.com/mod/embeddium).
-        
-        - **Have you checked whether you are [using mods that Embeddium does not support](https://github.com/embeddedt/embeddium/wiki/Unsupported-mods)?**
-        Sometimes Embeddium makes existing issues with these mods more obvious.
+        - **Have you ensured that your installation is up-to-date?** The patched client and its patch are built from this
+        repository, so compare against the latest commit before reporting.
         
         - **Have you read Sodium's [list of known driver incompatibilities](https://github.com/CaffeineMC/sodium-fabric/wiki/Driver-Compatibility)?** Most problems
         (including "poor performance") are caused by out-of-date or incompatible graphics drivers.

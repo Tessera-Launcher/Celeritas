@@ -30,9 +30,9 @@ public class PrimitiveChunkBuildContext extends ChunkBuildContext {
         this.world = world;
         this.transparencyTracker = CeleritasWorldRenderer.instance().getTransparencyTracker();
         //? if >=1.8 {
-        //this.tesselator = new BufferBuilder(8192);
+        this.tesselator = new BufferBuilder(8192);
         //?} else
-        this.tesselator = BufferBuilder.INSTANCE;
+        //this.tesselator = BufferBuilder.INSTANCE;
     }
 
     private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
@@ -66,12 +66,12 @@ public class PrimitiveChunkBuildContext extends ChunkBuildContext {
         int numQuads = vertexCount / 4;
         outputQuads(rawBuffer, celeritasVertices, numQuads, buffers, material, NORMAL_WINDING);
         //? if <1.7 {
-        if (material.pass == PrimitiveRenderPassConfigurationBuilder.TRANSLUCENT_PASS) {
+        /*if (material.pass == PrimitiveRenderPassConfigurationBuilder.TRANSLUCENT_PASS) {
             // We need to emulate backface culling as the legacy renderer relies on it. Write the same quads again
             // in reverse winding order.
             outputQuads(rawBuffer, celeritasVertices, numQuads, buffers, material, BACKFACE_WINDING);
         }
-        //?}
+        *///?}
     }
 
     private void outputQuads(IntBuffer rawBuffer, ChunkVertexEncoder.Vertex[] celeritasVertices, int numQuads, ChunkBuildBuffers buffers, Material material, int[] winding) {
@@ -87,7 +87,7 @@ public class PrimitiveChunkBuildContext extends ChunkBuildContext {
 
                 // In 1.8+, color comes before all UVs. In 1.7-, texture UV comes before color.
                 //? if >=1.8
-                //vertex.color = rawBuffer.get(ptr++);
+                vertex.color = rawBuffer.get(ptr++);
 
                 float u = Float.intBitsToFloat(rawBuffer.get(ptr++));
                 float v = Float.intBitsToFloat(rawBuffer.get(ptr++));
@@ -96,9 +96,9 @@ public class PrimitiveChunkBuildContext extends ChunkBuildContext {
                 vertex.v = v;
                 vSum += v;
                 //? if <1.8 {
-                vertex.color = rawBuffer.get(ptr++);
+                /*vertex.color = rawBuffer.get(ptr++);
                 vertex.vanillaNormal = rawBuffer.get(ptr++);
-                //?}
+                *///?}
                 vertex.light = rawBuffer.get(ptr++);
             }
             int trueNormal = QuadUtil.calculateNormal(celeritasVertices);
@@ -108,15 +108,15 @@ public class PrimitiveChunkBuildContext extends ChunkBuildContext {
             ModelQuadFacing facing = QuadUtil.findNormalFace(trueNormal);
             // TODO implement render pass downgrading for 1.5+
             //? if <1.5 {
-            // Pretend the atlas is 256x256 for the purposes of computing the sprite ID
+            /*// Pretend the atlas is 256x256 for the purposes of computing the sprite ID
             uSum /= 4;
             vSum /= 4;
             int spriteX = MathUtil.mojfloor(uSum * 256.0f);
             int spriteY = MathUtil.mojfloor(vSum * 256.0f);
             int spriteId = (spriteY / 16) * 16 + spriteX / 16;
             Material correctMaterial = selectMaterial(material, tracker.getTransparencyLevel(spriteId));
-            //?} else
-            //Material correctMaterial = material;
+            *///?} else
+            Material correctMaterial = material;
             buffers.get(correctMaterial).getVertexBuffer(facing).push(celeritasVertices, correctMaterial);
         }
     }

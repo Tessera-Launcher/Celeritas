@@ -15,8 +15,6 @@ on:
           - RELEASE
 
 env:
-  ORG_GRADLE_PROJECT_celeritas_target_versions_pattern: ".*"
-  ORG_GRADLE_PROJECT_celeritas_target_subprojects_pattern: ".*"
   DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
   MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
   MAVEN_SECRET: ${{ secrets.MAVEN_SECRET }}
@@ -51,7 +49,7 @@ jobs:
       - name: Publish common module
         if: ${{ inputs.release_type != 'DRY_RUN' }}
         run: ./gradlew :common:publish -Prelease_channel=${{ inputs.release_type }}
-      - name: Build all packaged jars
-        run: ./gradlew packageJar
+      - name: Build the 1.8.9 jar
+        run: ./gradlew :ornithe:packageJar
       - name: Show checksums
         run: find build/libs -name \*.jar | sort | xargs sha256sum

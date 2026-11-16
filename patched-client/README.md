@@ -9,13 +9,13 @@ its runtime class path.
 
 ```sh
 # 1. the ordinary Celeritas jar (Ornithe intermediary namespace)
-./gradlew :ornithe:1.8.9:packageJar -Pceleritas_target_versions=1.8.9
+./gradlew :ornithe:packageJar
 
 # 2. remap it to Mojang official names for the vanilla client jar
 ./patched-client/remap-official.sh
 
 # 3. download the official 1.8.9 client + libraries, then build the patched jar
-./gradlew :patched-client:patchClientJar -Pceleritas_target_versions=1.8.9
+./gradlew :patched-client:patchClientJar
 ```
 
 Step 3 fetches `version_manifest_v2.json`, the 1.8.9 version JSON, its
@@ -64,11 +64,13 @@ still reference (see below).
 - Pins the parts of Mixin's output that vary per run: the random
   `@MixinMerged.sessionId` and the `md<uid>$…`/`fd<uid>$…` names of generated
   members (the uid is the order in which target classes asked for one) are
-  replaced with declaration-order names. Two builds of the same inputs are
-  therefore byte identical, which is what keeps Tessera's AOT cache valid.
+  replaced with declaration-order names. Added entries are also written in
+  sorted order, so the jar does not inherit the (unstable) entry order of the
+  remapped Celeritas jar. Two builds of the same inputs are therefore byte
+  identical, which is what keeps Tessera's AOT cache valid.
 
 fastutil is provided by Tessera: its installer adds the same
-`it.unimi.dsi:fastutil:8.5.18` artifact that modern version indexes already list.
+`it.unimi.dsi:fastutil:8.5.18` artifact the client needs.
 The patched client itself stays small; fastutil is a normal library on the game
 class path.
 

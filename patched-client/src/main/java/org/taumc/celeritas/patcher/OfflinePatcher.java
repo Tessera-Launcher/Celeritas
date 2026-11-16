@@ -25,11 +25,11 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -320,41 +320,46 @@ public final class OfflinePatcher {
 
     private static int addCeleritas(ZipOutputStream out, Set<String> written, Path jar,
                                     Set<String> referenced) throws Exception {
-        int added = 0;
+        Map<String, byte[]> entries = new TreeMap<>();
         try (ZipFile zip = new ZipFile(jar.toFile())) {
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
+            Enumeration<? extends ZipEntry> enumeration = zip.entries();
+            while (enumeration.hasMoreElements()) {
+                ZipEntry entry = enumeration.nextElement();
                 String name = entry.getName();
                 if (entry.isDirectory() || signature(name) || skipMetadata(name)
                         || name.equals("fabric.mod.json") || name.equals("mixins.celeritas.json")
                         || name.equals(MIXIN_CONFIG) || skipCeleritasMixin(name)) {
                     continue;
                 }
-                byte[] bytes = zip.getInputStream(entry).readAllBytes();
+                entries.put(safe(name), zip.getInputStream(entry).readAllBytes());
+            }
+        }
+        int added = 0;
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            String name = entry.getKey();
+            byte[] bytes = entry.getValue();
+            if (name.endsWith(".class")) {
+                byte[] rewritten = Lwjgl3Rewriter.rewrite(name, bytes);
+                if (rewritten != null) {
+                    bytes = rewritten;
+                }
+            }
+            if (writeAdded(out, written, name, bytes)) {
                 if (name.endsWith(".class")) {
-                    byte[] rewritten = Lwjgl3Rewriter.rewrite(name, bytes);
-                    if (rewritten != null) {
-                        bytes = rewritten;
-                    }
+                    collectReferences(bytes, referenced);
                 }
-                if (writeAdded(out, written, safe(name), bytes)) {
-                    if (name.endsWith(".class")) {
-                        collectReferences(bytes, referenced);
-                    }
-                    added++;
-                }
+                added++;
             }
         }
         return added;
     }
 
     private static int addLwjgl3(ZipOutputStream out, Set<String> written, Path jar) throws Exception {
-        int added = 0;
+        Map<String, byte[]> entries = new TreeMap<>();
         try (ZipFile zip = new ZipFile(jar.toFile())) {
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
+            Enumeration<? extends ZipEntry> enumeration = zip.entries();
+            while (enumeration.hasMoreElements()) {
+                ZipEntry entry = enumeration.nextElement();
                 String name = entry.getName();
                 if (entry.isDirectory() || signature(name) || skipMetadata(name)
                         || name.startsWith("org/objectweb/asm/") || name.startsWith("TesseraLwjgl3Agent")) {
@@ -363,9 +368,13 @@ public final class OfflinePatcher {
                 if (!name.startsWith("org/lwjgl/") && !name.equals("tessera/lwjgl3/Bridge.class")) {
                     continue;
                 }
-                if (writeAdded(out, written, safe(name), zip.getInputStream(entry).readAllBytes())) {
-                    added++;
-                }
+                entries.put(safe(name), zip.getInputStream(entry).readAllBytes());
+            }
+        }
+        int added = 0;
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            if (writeAdded(out, written, entry.getKey(), entry.getValue())) {
+                added++;
             }
         }
         return added;
@@ -379,7 +388,7 @@ public final class OfflinePatcher {
      */
     private static int addMixinExtras(ZipOutputStream out, Set<String> written, Path jar,
                                       Set<String> referenced) throws Exception {
-        Map<String, byte[]> available = new LinkedHashMap<>();
+        Map<String, byte[]> available = new TreeMap<>();
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
@@ -456,25 +465,27 @@ public final class OfflinePatcher {
         if (!Files.isRegularFile(jar)) {
             return 0;
         }
-        int added = 0;
+        Map<String, byte[]> entries = new TreeMap<>();
         try (ZipFile zip = new ZipFile(jar.toFile())) {
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
+            Enumeration<? extends ZipEntry> enumeration = zip.entries();
+            while (enumeration.hasMoreElements()) {
+                ZipEntry entry = enumeration.nextElement();
                 String name = entry.getName();
                 if (entry.isDirectory() || signature(name) || !name.endsWith(".class")) {
                     continue;
                 }
-                byte[] bytes = zip.getInputStream(entry).readAllBytes();
-                byte[] rewritten = Lwjgl3Rewriter.rewrite(name, bytes);
-                if (rewritten == null) {
-                    continue;
+                byte[] rewritten = Lwjgl3Rewriter.rewrite(name, zip.getInputStream(entry).readAllBytes());
+                if (rewritten != null) {
+                    entries.put(safe(name), rewritten);
                 }
-                if (writeAdded(out, written, safe(name), rewritten)) {
-                    collectReferences(rewritten, referenced);
-                    added++;
-                    System.out.println("rewrote library class " + jar.getFileName() + "!" + name);
-                }
+            }
+        }
+        int added = 0;
+        for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
+            if (writeAdded(out, written, entry.getKey(), entry.getValue())) {
+                collectReferences(entry.getValue(), referenced);
+                added++;
+                System.out.println("rewrote library class " + jar.getFileName() + "!" + entry.getKey());
             }
         }
         return added;
@@ -499,7 +510,7 @@ public final class OfflinePatcher {
     private static int addGenerated(ZipOutputStream out, Set<String> written, Set<String> referenced,
                                     Set<String> referencedMixins)
             throws IOException {
-        Map<String, byte[]> definitions = new LinkedHashMap<>(ClassGenUtils.getDefinitions());
+        Map<String, byte[]> definitions = new TreeMap<>(ClassGenUtils.getDefinitions());
         int added = 0;
         for (Map.Entry<String, byte[]> entry : definitions.entrySet()) {
             String name = entry.getKey().replace('.', '/') + ".class";

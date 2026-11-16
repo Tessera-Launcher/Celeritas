@@ -15,9 +15,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MinecraftMixin {
     private static final String INIT_DISPLAY_METHOD =
             //? if <1.8 {
-            "init"
+            //"init"
              //?} else
-            //"initDisplay"
+            "initDisplay"
     ;
 
     /**

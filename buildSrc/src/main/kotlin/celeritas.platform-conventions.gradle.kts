@@ -1,11 +1,4 @@
-import bs.ModLoader
-import dev.kikugie.stonecutter.build.StonecutterBuildExtension
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
 import org.embeddedt.embeddium.gradle.build.extensions.versionedProperty
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 plugins {
     id("com.gradleup.shadow")
@@ -14,16 +7,9 @@ plugins {
 
 evaluationDependsOn(":common")
 
-val stonecutterExt = project.extensions.findByType<StonecutterBuildExtension>()
-
 java {
     toolchain {
-        // Minecraft 26.1 and later run on (and are compiled against) Java 25.
-        languageVersion = if ((stonecutterExt?.compare(stonecutterExt.current.version, "26.1") ?: -1) >= 0) {
-            JavaLanguageVersion.of(25)
-        } else {
-            JavaLanguageVersion.of(21)
-        }
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -44,80 +30,12 @@ repositories {
         }
     }
     maven {
-        url = uri("https://maven.cleanroommc.com")
-        content {
-            includeGroup("zone.rong")
-        }
-    }
-    maven {
-        name = "GTNH Maven"
-        url = uri("https://nexus.gtnewhorizons.com/repository/public/")
-        content {
-            includeGroupAndSubgroups("com.gtnewhorizons")
-        }
-    }
-    maven {
-        name = "Su5eD Maven"
-        url = uri("https://maven.su5ed.dev/releases")
-        content {
-            includeGroupAndSubgroups("dev.su5ed.sinytra")
-            includeGroupAndSubgroups("org.sinytra")
-        }
-    }
-    maven {
         name = "Fabric Maven"
         url = uri("https://maven.fabricmc.net/")
         content {
             includeGroupAndSubgroups("net.fabricmc")
         }
     }
-    /*
-    maven {
-        name = "GTCEu Maven"
-        url = uri("https://maven.gtceu.com/")
-    }
-    maven {
-        url = uri("https://files.prismlauncher.org/maven")
-        metadataSources { artifact() }
-    }
-     */
-    exclusiveContent {
-        forRepository {
-            maven {
-                url = uri("https://cursemaven.com")
-            }
-        }
-        filter {
-            includeGroup("curse.maven")
-        }
-    }
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = "Modrinth"
-                url = uri("https://api.modrinth.com/maven")
-            }
-        }
-        filter {
-            includeGroup("maven.modrinth")
-        }
-    }
-    /*
-    maven {
-        // location of the maven that hosts JEI files
-        name = "Progwml6 maven"
-        url = uri("https://dvs1.progwml6.com/files/maven/")
-    }
-    maven {
-        // location of a maven mirror for JEI files, as a fallback
-        name = "ModMaven"
-        url = uri("https://modmaven.dev")
-    }
-    maven {
-        name = "Glass-Launcher"
-        url = uri("https://maven.glass-launcher.net/releases/")
-    }
-     */
     maven {
         name = "taumc releases"
         url = uri("https://maven.taumc.org/releases")
@@ -139,37 +57,8 @@ tasks.withType<AbstractArchiveTask>().configureEach {
     isReproducibleFileOrder = true
 }
 
-val modLoader: ModLoader? = ModLoader.fromProject(project)
-val minecraftVersion = ModLoader.getMinecraftVersion(project)
-
-val modMixinConfigs = mutableListOf("embeddium.mixins.json")
-project.extra.set("celeritasMixinConfigs", modMixinConfigs)
-
-if (generateSequence(project) { it.parent }.any { it.name == "modern" }) {
-    val platformVersionSourceDir = if((stonecutterExt?.compare(stonecutterExt.current.version, "1.21.11") ?: -1) >= 0) {
-        "postmodern"
-    } else {
-        "modern"
-    }
-    // The postmodern settings screen backend lives in postmodern_java.
-    if ((stonecutterExt?.constants?.get("settings_gui") ?: false) && platformVersionSourceDir == "modern") {
-        sourceSets {
-            main {
-                java.srcDir("src/main/gui_java")
-            }
-        }
-    }
-    sourceSets {
-        main {
-            java.srcDir("src/main/${platformVersionSourceDir}_java")
-        }
-    }
-}
-
 tasks.named<ProcessResources>("processResources") {
     val inputProps = mutableMapOf(
-            "forgeid" to if (modLoader == ModLoader.NEOFORGE) "neoforge" else "forge",
-            "minecraft" to (versionedProperty("minecraft_dependency") ?: ""),
             "mod_version" to version,
             "mod_id" to rootProject.property("mod_id"),
             "mod_display_name" to rootProject.property("mod_display_name"),
@@ -181,88 +70,15 @@ tasks.named<ProcessResources>("processResources") {
             "fabricloader" to rootProject.property("fabricloader"),
             "contributors" to rootProject.property("mod_contributors").toString(),
             "authors" to rootProject.property("mod_authors").toString(),
-            "fabric_api_modules" to rootProject.property("fabric_api_modules")
+            "fabric_api_modules" to rootProject.property("fabric_api_modules"),
+            "minecraft" to (versionedProperty("minecraft_dependency") ?: "")
     )
-
-    stonecutterExt?.let {
-        val mixinCompatLevel = if (it.eval(minecraftVersion, "<1.17")) {
-            "JAVA_8"
-        } else if (it.eval(minecraftVersion, "<1.18")) {
-            "JAVA_16"
-        } else {
-            "JAVA_17"
-        }
-        inputProps.put("mixinCompatLevel", mixinCompatLevel)
-    }
 
     inputProps.forEach { (key, value) ->
         inputs.property(key, value)
     }
 
-    filesMatching(listOf("fabric.mod.json", "META-INF/mods.toml", "META-INF/neoforge.mods.toml", "quilt.mod.json", "embeddium.mixins.json")) {
+    filesMatching("fabric.mod.json") {
         expand(inputProps)
-    }
-
-    if (modLoader == ModLoader.FORGE || modLoader == ModLoader.NEOFORGE) {
-        exclude("fabric.mod.json")
-    } else if (modLoader == ModLoader.FABRIC) {
-        exclude("META-INF/mods.toml", "META-INF/accesstransformer.cfg", "pack.mcmeta")
-    }
-
-    val isNeoForge = modLoader == ModLoader.NEOFORGE
-    val isFabric = modLoader == ModLoader.FABRIC
-    val modId = rootProject.property("mod_id").toString()
-    val mixinConfigs = modMixinConfigs
-    val declareAllMixinConfigs = (stonecutterExt?.compare(stonecutterExt.current.version, "26.1") ?: -1) >= 0
-    inputs.property("mixinConfigs", mixinConfigs)
-    // The shader pack Flywheel backend depends on Flywheel internals that changed in 1.0.6, and replaces Colorwheel.
-    val minFlywheelVersion = if (versionedProperty("flywheel_version") != null) "1.0.6" else null
-    inputs.property("minFlywheelVersion", minFlywheelVersion ?: "")
-
-    doLast {
-        val outputDir = Path.of(outputs.files.asPath)
-
-        val modsTOML = outputDir.resolve("META-INF/mods.toml")
-
-        if (minFlywheelVersion != null && !isFabric && Files.exists(modsTOML)) {
-            val loaderDependency = { id: String, type: String, mandatory: Boolean, range: String ->
-                "\n\n[[dependencies.${modId}]]\nmodId = \"${id}\"\nmandatory = ${mandatory}\ntype = \"${type}\"\nversionRange = \"${range}\"\nordering = \"NONE\"\nside = \"CLIENT\""
-            }
-            modsTOML.toFile().appendText(loaderDependency("flywheel", "optional", false, "[${minFlywheelVersion},)"))
-            modsTOML.toFile().appendText(if (isNeoForge) {
-                loaderDependency("colorwheel", "incompatible", false, "*")
-            } else {
-                // Forge has no incompatible dependencies, but rejects an optional one whose range nothing satisfies.
-                loaderDependency("colorwheel", "optional", false, "(,0)")
-            })
-        }
-
-        if (isNeoForge) {
-            if (Files.exists(modsTOML)) {
-                // 26.1 no longer reads mixin configs from the jar manifest or the --mixin.config argument.
-                val declaredConfigs = if (declareAllMixinConfigs) mixinConfigs else listOf("${modId}.mixins.json")
-                for (config in declaredConfigs) {
-                    modsTOML.toFile().appendText("\n\n[[mixins]]\nconfig = \"${config}\"")
-                }
-
-                Files.copy(modsTOML, outputDir.resolve("META-INF/neoforge.mods.toml"), StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
-        if (isFabric) {
-            val fabricModJson = outputDir.resolve("fabric.mod.json")
-
-            if (Files.exists(fabricModJson)) {
-                val file = fabricModJson.toFile()
-                val parse = JsonSlurper().parse(file) as MutableMap<String, Any>
-
-                parse["mixins"] = mixinConfigs.toList()
-
-                if (minFlywheelVersion != null) {
-                    parse["breaks"] = mapOf("flywheel" to "<${minFlywheelVersion}", "colorwheel" to "*")
-                }
-
-                file.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(parse)))
-            }
-        }
     }
 }

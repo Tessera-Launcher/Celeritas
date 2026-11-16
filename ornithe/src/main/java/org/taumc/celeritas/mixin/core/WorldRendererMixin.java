@@ -9,13 +9,13 @@ import net.minecraft.client.render.world.WorldRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.living.LivingEntity;
 //? if >=1.8 {
-/*import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.world.ClientWorld;
 import net.minecraft.client.render.block.BlockLayer;
 import net.minecraft.entity.projectile.WitherSkullEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import org.taumc.celeritas.impl.render.entity.EntityGatherer;
-*///?}
+//?}
 import net.minecraft.world.World;
 import org.embeddedt.embeddium.impl.gl.device.RenderDevice;
 import org.embeddedt.embeddium.impl.render.viewport.ViewportProvider;
@@ -37,12 +37,12 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
     private Minecraft minecraft;
 
     //? if <1.8 {
-    @Shadow
+    /*@Shadow
     private int chunkGridSizeX, chunkGridSizeY, chunkGridSizeZ;
-    //?}
+    *///?}
 
     //? if >=1.8 {
-    /*@Shadow
+    @Shadow
     private int viewDistance;
 
     @Shadow
@@ -56,7 +56,7 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
 
     @Shadow
     private int globalEntityCount;
-    *///?}
+    //?}
 
     private CeleritasWorldRenderer renderer;
 
@@ -83,13 +83,13 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
 
 
     //? if <1.8 {
-    @Inject(method = { "reload", "m_6748042" }, at = @At(opcode = Opcodes.PUTFIELD, value = "FIELD", target = "Lnet/minecraft/client/render/world/WorldRenderer;chunkGridSizeZ:I", shift = At.Shift.AFTER))
+    /*@Inject(method = { "reload", "m_6748042" }, at = @At(opcode = Opcodes.PUTFIELD, value = "FIELD", target = "Lnet/minecraft/client/render/world/WorldRenderer;chunkGridSizeZ:I", shift = At.Shift.AFTER))
     private void nullifyBuiltChunkStorage(CallbackInfo ci) {
         this.chunkGridSizeX = 0;
         this.chunkGridSizeY = 0;
         this.chunkGridSizeZ = 0;
     }
-    //?}
+    *///?}
 
     /**
      * @reason Redirect the chunk layer render passes to our renderer
@@ -97,9 +97,9 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
      */
     @Overwrite
     //? if <1.8 {
-    public int render(LivingEntity viewEntity, int layer, double ticks) {
+    //public int render(LivingEntity viewEntity, int layer, double ticks) {
     //?} else
-    //public int render(BlockLayer layer, double ticks, int anaglyphRenderPass, Entity viewEntity) {
+    public int render(BlockLayer layer, double ticks, int anaglyphRenderPass, Entity viewEntity) {
         @SuppressWarnings("unused")
         // Allow FalseTweaks mixin to replace constant
         double magicSortingConstantValue = 1.0D;
@@ -113,7 +113,7 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
         double d5 = viewEntity.prevTickZ + (viewEntity.z - viewEntity.prevTickZ) * ticks;
 
         //? if >=1.0.0-beta.8 {
-        this.minecraft.gameRenderer.enableLightMap(/*? if <1.8 {*/ticks/*?}*/);
+        this.minecraft.gameRenderer.enableLightMap(/*? if <1.8 {*//*ticks*//*?}*/);
         //?}
 
         try {
@@ -123,7 +123,7 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
         }
 
         //? if >=1.0.0-beta.8 {
-        this.minecraft.gameRenderer.disableLightMap(/*? if <1.8 {*/ticks/*?}*/);
+        this.minecraft.gameRenderer.disableLightMap(/*? if <1.8 {*//*ticks*//*?}*/);
         //?}
 
         return 1;
@@ -138,14 +138,14 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
      */
     @Overwrite
     //? if >=1.8 {
-    /*public void setupRender(Entity camera, double tickDelta, Culler culler, int frame, boolean loadChunks) {
+    public void setupRender(Entity camera, double tickDelta, Culler culler, int frame, boolean loadChunks) {
         if (this.minecraft.options.viewDistance != this.viewDistance) {
             this.reload();
         }
 
         updateFrustums(culler, (float)tickDelta);
     }
-    *///?}
+    //?}
     public void updateFrustums(Culler camera, float tick) {
         RenderDevice.enterManagedCode();
 
@@ -168,9 +168,9 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
     }
 
     //? if <1.3 {
-    private static final String ON_RELOAD = "m_6748042";
+    //private static final String ON_RELOAD = "m_6748042";
     //?} else
-    //private static final String ON_RELOAD = "reload()V";
+    private static final String ON_RELOAD = "reload()V";
 
     @Inject(method = ON_RELOAD, at = @At("RETURN"))
     private void onReload(CallbackInfo ci) {
@@ -185,27 +185,27 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
 
     @Overwrite
     //? if <1.8 {
-    public boolean compileChunks(LivingEntity camera, boolean force) {
+    /*public boolean compileChunks(LivingEntity camera, boolean force) {
         return true;
     }
-    //?} else {
-    /*public void compileChunksUntil(long time) {
+    *///?} else {
+    public void compileChunksUntil(long time) {
 
     }
-    *///?}
+    //?}
 
     @Inject(method = "renderEntities", at = @At(value = "FIELD", target = "Lnet/minecraft/client/render/world/WorldRenderer;globalBlockEntities:"
             //? if >=1.8 {
-            //+ "Ljava/util/Set;"
+            + "Ljava/util/Set;"
             //?} else
-            + "Ljava/util/List;"
+            //+ "Ljava/util/List;"
             , ordinal = 0))
     public void sodium$renderTileEntities(CallbackInfo ci, @Local(ordinal = 0, argsOnly = true) float partialTicks) {
         this.renderer.renderBlockEntities(partialTicks);
     }
 
     //? if >=1.8 {
-    /*private final EntityGatherer celeritas$entityGatherer = new EntityGatherer();
+    private final EntityGatherer celeritas$entityGatherer = new EntityGatherer();
 
     @Inject(method = "renderEntities", at = @At(value = "INVOKE_STRING", target = "Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V", args = "ldc=entities"))
     private void celeritas$renderEntities(Entity camera, Culler culler, float tickDelta, CallbackInfo ci, @Local(ordinal = 0) double d, @Local(ordinal = 1) double e, @Local(ordinal = 2) double g) {
@@ -238,7 +238,7 @@ public abstract class WorldRendererMixin implements RenderGlobalExtension {
             this.entityRenderDispatcher.renderSecondPass(entity, tickDelta);
         }
     }
-    *///?}
+    //?}
 
     /**
      * @reason Replace the debug string

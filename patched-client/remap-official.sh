@@ -2,12 +2,12 @@
 # Remap the built 1.8.9 Celeritas jar from Ornithe intermediary to Mojang
 # official names, so the patcher can target Tessera's ordinary 1.8.9 client jar.
 #
-# Run  ./gradlew :ornithe:1.8.9:packageJar -Pceleritas_target_versions=1.8.9
+# Run  ./gradlew :ornithe:packageJar
 # first, then this script.  The result is patched-client/build/celeritas-official.jar.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION=$(./gradlew -q properties -Pceleritas_target_versions=1.8.9 2>/dev/null | awk '/^version:/ {print $2}' | head -1)
+VERSION=$(./gradlew -q properties 2>/dev/null | awk '/^version:/ {print $2}' | head -1)
 if [ -z "$VERSION" ]; then
   VERSION=$(grep '^project_base_version=' gradle.properties | cut -d= -f2)
   VERSION="$VERSION-dev"
@@ -18,7 +18,7 @@ TESSERA_DATA="${TESSERA_DATA:-/home/ygbs/桌面/Tessera/target/debug/data}"
 GAME="$TESSERA_DATA/游戏"
 
 if [ ! -f "$INPUT" ]; then
-  echo "missing $INPUT; build :ornithe:1.8.9:packageJar first" >&2
+  echo "missing $INPUT; build :ornithe:packageJar first" >&2
   exit 1
 fi
 mkdir -p patched-client/build

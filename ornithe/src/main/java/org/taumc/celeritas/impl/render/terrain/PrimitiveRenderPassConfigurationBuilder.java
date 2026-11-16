@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 //? if >=1.8
-//import net.minecraft.client.render.block.BlockLayer;
+import net.minecraft.client.render.block.BlockLayer;
 import org.embeddedt.embeddium.impl.render.chunk.RenderPassConfiguration;
 import org.embeddedt.embeddium.impl.render.chunk.compile.sorting.QuadPrimitiveType;
 import org.embeddedt.embeddium.impl.render.chunk.terrain.TerrainRenderPass;
@@ -27,11 +27,11 @@ public class PrimitiveRenderPassConfigurationBuilder {
         @Override
         public void setup() {
             //? if <1.7 {
-            if (pass == 1) {
+            /*if (pass == 1) {
                 // Force translucent pass to use backface culling
                 GL11.glEnable(GL11.GL_CULL_FACE);
             }
-            //?}
+            *///?}
             if (disableBlend) {
                 GL11.glDisable(GL11.GL_ALPHA_TEST);
             }
@@ -43,11 +43,11 @@ public class PrimitiveRenderPassConfigurationBuilder {
                 GL11.glEnable(GL11.GL_ALPHA_TEST);
             }
             //? if <1.7 {
-            if (pass == 1) {
+            /*if (pass == 1) {
                 // Disable backface culling again
                 GL11.glDisable(GL11.GL_CULL_FACE);
             }
-            //?}
+            *///?}
         }
     }
 
@@ -85,7 +85,7 @@ public class PrimitiveRenderPassConfigurationBuilder {
 
     public static RenderPassConfiguration<?> build(ChunkVertexType vertexType) {
         //? if <1.8 {
-        Int2ObjectMap<Collection<TerrainRenderPass>> vanillaRenderStages = new Int2ObjectOpenHashMap<>();
+        /*Int2ObjectMap<Collection<TerrainRenderPass>> vanillaRenderStages = new Int2ObjectOpenHashMap<>();
 
         vanillaRenderStages.put(1, List.of(TRANSLUCENT_PASS));
         vanillaRenderStages.put(0, List.of(SOLID_PASS, CUTOUT_MIPPED_PASS));
@@ -96,8 +96,8 @@ public class PrimitiveRenderPassConfigurationBuilder {
 
         renderTypeToMaterialMap.put(0, CUTOUT_MIPPED_MATERIAL);
         renderTypeToMaterialMap.put(1, TRANSLUCENT_MATERIAL);
-        //?} else {
-        /*Map<BlockLayer, Collection<TerrainRenderPass>> vanillaRenderStages = new Reference2ReferenceOpenHashMap<>();
+        *///?} else {
+        Map<BlockLayer, Collection<TerrainRenderPass>> vanillaRenderStages = new Reference2ReferenceOpenHashMap<>();
         vanillaRenderStages.put(BlockLayer.SOLID, List.of(SOLID_PASS, CUTOUT_MIPPED_PASS));
         vanillaRenderStages.put(BlockLayer.TRANSLUCENT, List.of(TRANSLUCENT_PASS));
 
@@ -106,7 +106,7 @@ public class PrimitiveRenderPassConfigurationBuilder {
         renderTypeToMaterialMap.put(BlockLayer.CUTOUT, CUTOUT_MATERIAL);
         renderTypeToMaterialMap.put(BlockLayer.CUTOUT_MIPPED, CUTOUT_MIPPED_MATERIAL);
         renderTypeToMaterialMap.put(BlockLayer.TRANSLUCENT, TRANSLUCENT_MATERIAL);
-        *///?}
+        //?}
 
         return new RenderPassConfiguration<>(renderTypeToMaterialMap,
                 vanillaRenderStages,

@@ -1,63 +1,61 @@
-<img src="modern/src/main/resources/icon.png" width="128">
+<img src="ornithe/src/main/resources/icon.png" width="128">
 
 # Celeritas
 
-Celeritas is a free and open-source performance & shaders mod for Minecraft clients. It is a fork of Embeddium (which itself
-was based on the last FOSS-licensed version of Sodium) and Oculus/Iris.
+Celeritas is a free and open-source performance mod for Minecraft clients, forked from Embeddium (which itself was based
+on the last FOSS-licensed version of Sodium 0.5.11-).
 
-I maintain this mod for personal use & experimentation and make the source code available for other projects and
-developers who may be interested. There is also no guarantee of active maintenance, including bugfixes
-or ports to any newer Minecraft versions. That said, the code remains
-LGPL-3.0, so other projects under a compatible license (including Embeddium) should feel free to incorporate bugfixes
-and features they find useful. That said, expect minimal support, and many possible bugs due to limited testing.
-
-**Important note:** There are currently no official Celeritas binary releases. If you download a precompiled
-Celeritas .jar file from any 3rd party source, we cannot provide any support for such files, and you do so at your own
-risk. As of writing, the only official distribution of Celeritas available is the original source code
-at https://git.taumc.org/embeddedt/celeritas, 
+This tree is trimmed down to the one thing it is actually used for: producing the **statically patched 1.8.9 client**
+(`client.jar`) and the patch that turns a vanilla 1.8.9 client into it (`client.tpatch`). There is no mod-loader jar for
+1.8.9 and no support for any other Minecraft version here.
 
 ## Project layout
 
-Celeritas uses the [Stonecutter](https://codeberg.org/stonecutter/stonecutter) toolchain to reduce the effort required
-to support individual Minecraft versions. Additionally, as much core rendering code as possible is fully abstracted
-from Minecraft within a `:common` project. The common module is published on
-[Maven](https://maven.taumc.org/#/releases/org/embeddedt/celeritas/celeritas-common), to allow downstream projects to
-consume it without rebuilding the entire project from source. However, the production mod jars are not available on Maven.
+| Path | Purpose |
+| --- | --- |
+| `common/` | The Minecraft-independent rendering core (`org.embeddedt.embeddium.impl.*`). |
+| `ornithe/` | The 1.8.9 target (Ornithe/Feather mappings, Loom + Pylon). Produces `celeritas-fabriclike-mc8.9-<version>.jar`, the Celeritas classes the patched client embeds. |
+| `patched-client/` | Applies Celeritas' mixins and Tessera's LWJGL3 shim to the vanilla 1.8.9 `client.jar` at build time, and emits `client.jar` + `client.tpatch`. |
+| `patch-tool/` | The Rust generator/applier for the `.tpatch` format. |
+
+`ornithe/src/main` is the resolved 1.8.9 source; the multi-version [Stonecutter](https://codeberg.org/stonecutter/stonecutter)
+machinery was removed together with the other targets.
 
 ## How to build
 
-**`celeritas_target_versions` must be set when building locally, as no projects are configured by default.**
-You may want to set it in your user properties file (e.g. `~/.gradle/gradle.properties`) to avoid specifying
-it in every command-line Gradle invocation or modifying the checked-in `gradle.properties`.
+```sh
+# 1. the Celeritas jar (Ornithe intermediary namespace)
+./gradlew :ornithe:packageJar
 
-The fastest way to build for exactly one version target is to run `./gradlew -Pceleritas_target_versions=<version> packageJar`.
-The resulting jar file will be available
-in `build/libs/<celeritas version>`.
+# 2. remap it to the names the vanilla client uses
+./patched-client/remap-official.sh
 
-Note: the `celeritas_target_versions` property accepts a standard Stonecutter predicate, so you can also use syntax like
-`./gradlew -Pceleritas_target_versions="<1.8.9"`.
+# 3. fetch the official 1.8.9 client + libraries and build the patched client
+./gradlew :patched-client:assemble
+```
 
-Alternatively, `celeritas_target_versions_pattern` accepts a Java regex, e.g.
-`./gradlew -Pceleritas_target_versions_pattern=.* packageJar` to build every Minecraft version at once.
+The result lands in `patched-client/build/libs/`:
+
+```text
+client-base.jar   normalized vanilla client (the patch base)
+client.jar        patched client
+client.tpatch     patch from client-base.jar -> client.jar
+```
+
+`patched-client/README.md` describes what the patcher does in detail, and `patched-client/run-test.sh` launches the
+result against a Tessera installation without any `-javaagent`.
 
 ## How to use
 
-Celeritas generally requires a "modernized" environment on older Minecraft versions, and will not run out-of-the-box
-with a default modded Minecraft instance. Newer Minecraft versions ship with the necessary dependencies and will not
-require any custom setup.
-
-* Forge 1.12.2 is supported out of the box on Java 8 + LWJGL 2.
-* Older versions of Minecraft require lwjgl3ify (or an equivalent) & Java 21. (This requirement will begin being relaxed in the near future.)
-* For modern (1.13+) versions, the final mod jar should run as-is in a standard instance for that version (e.g. Java 17
-or 21 are not required, unless the underlying Minecraft version itself requires them).
+The patched client needs a modernized runtime: Tessera's 1.8.9 installation ships Pylon (LWJGL3) and fastutil, which is
+what the client jar expects. There is no agent, no Mixin and no ASM on its runtime class path.
 
 ## License
 
 Celeritas is licensed under the Lesser GNU General Public License version 3, as it only uses code from Oculus/Iris,
-Sodium 0.5.11-, and other FOSS projects.
-
-Portions of the option screen code are based on Reese's Sodium Options by FlashyReese, and are used under the terms of
-the [MIT license](https://opensource.org/license/mit), located in `src/main/resources/licenses/rso.txt`.
+Sodium 0.5.11-, and other FOSS projects. The patcher and shim code in `patched-client/` are part of Celeritas (LGPL-3.0);
+the generated `client.jar` also embeds Tessera's LWJGL3 shim, which is GPL-3.0-or-later, so that jar is distributed
+under GPL-3.0-or-later.
 
 This project does not include and has no plans to include any code from Sodium 0.6+ or 0.5.12+, as these versions of
 Sodium are not available under a free and open-source license.
@@ -72,7 +70,6 @@ Please reach out to @embeddedt on Discord if you have concerns regarding the lic
 * rdh, for leading several key improvements, including faster & better occlusion culling, better AO rendering, etc
 * douira, for researching and writing the [paper](https://douira.dev/assets/document/douira-master-thesis.pdf) on which the translucency sorting v3 implementation is based
 * grondag, for developing [bitraster](https://github.com/vram-guild/bitraster), the library we vendor for rasterized occlusion culling
-* djefrey, for developing [Colorwheel](https://github.com/djefrey/Colorwheel), which our Flywheel backend for shader packs is ported from
 * XFactHD, Pepper, and anyone else I've forgotten to mention, for providing valuable code insights
 
 [![YourKit logo](https://www.yourkit.com/images/yklogo.png)](https://www.yourkit.com/)

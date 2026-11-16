@@ -30,9 +30,9 @@ public class FrustumCullerMixin implements ViewportProvider {
      */
     @Overwrite
     //? if >=1.3 {
-    //public boolean isVisible(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+    public boolean isVisible(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
     //?} else
-    public boolean m_7557245(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+    //public boolean m_7557245(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
         if (Double.isInfinite(minX) || Double.isInfinite(minY) || Double.isInfinite(minZ) || Double.isInfinite(maxX) || Double.isInfinite(maxY) || Double.isInfinite(maxZ)) {
             return true;
         }

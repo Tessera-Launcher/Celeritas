@@ -67,18 +67,18 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         var tesselator = buildContext.tesselator;
 
         //? if <1.8 {
-        Vector3i blockPos = new Vector3i(minX, minY, minZ);
-        var region = new WorldRegion(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1 /*? if >=1.7.10 {*//*, 1*//*?}*/);
+        /*Vector3i blockPos = new Vector3i(minX, minY, minZ);
+        var region = new WorldRegion(world, minX - 1, minY - 1, minZ - 1, maxX + 1, maxY + 1, maxZ + 1 /^? if >=1.7.10 {^/, 1/^?}^/);
         var renderBlocks = new net.minecraft.client.render.BlockRenderer(region);
         var extTesselator = (TessellatorExtension)tesselator;
         //? if <1.7
-        TessellatorAccessor.celeritas$setTriangleMode(false);
+        //TessellatorAccessor.celeritas$setTriangleMode(false);
         WorldChunk.hasSkyLight = false;
-        //?} else {
-        /*var blockPos = new net.minecraft.util.math.BlockPos.Mutable(minX, minY, minZ);
+        *///?} else {
+        var blockPos = new net.minecraft.util.math.BlockPos.Mutable(minX, minY, minZ);
         var region = new WorldRegion(world, new net.minecraft.util.math.BlockPos(minX, minY, minZ), new net.minecraft.util.math.BlockPos(maxX, maxY, maxZ), 1);
         var renderBlocks = net.minecraft.client.Minecraft.getInstance().getBlockRenderDispatcher();
-        *///?}
+        //?}
 
         tesselator.offset(-this.render.getOriginX(), -this.render.getOriginY(), -this.render.getOriginZ());
 
@@ -95,27 +95,27 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         blockPos.set(x, y, z);
 
                         //? if <1.7 {
-                        var blockId = chunk.getBlockAt(x & 15, y, z & 15);
+                        /*var blockId = chunk.getBlockAt(x & 15, y, z & 15);
 
                         if (blockId == 0) {
                             continue;
                         }
 
                         Block block = Block.BY_ID[blockId];
-                        //?} else if <1.8 {
+                        *///?} else if <1.8 {
                         /*Block block = chunk.getBlockAt(x & 15, y, z & 15);
 
                         if (block == net.minecraft.block.Blocks.AIR) {
                             continue;
                         }
                         *///?} else {
-                        /*var blockState = chunk.getBlockState(blockPos);
+                        var blockState = chunk.getBlockState(blockPos);
                         var block = blockState.getBlock();
 
                         if (block == net.minecraft.block.Blocks.AIR) {
                             continue;
                         }
-                        *///?}
+                        //?}
 
                         //? if <1.2.5 {
                         //boolean hasBlockEntity = Block.HAS_BLOCK_ENTITY[blockId];
@@ -124,9 +124,9 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
                         if (hasBlockEntity) {
                             //? if <1.8 {
-                            BlockEntity tileEntity = chunk.getBlockEntityAt(x & 15, y, z & 15);
+                            //BlockEntity tileEntity = chunk.getBlockEntityAt(x & 15, y, z & 15);
                             //?} else
-                            //BlockEntity tileEntity = chunk.getBlockEntity(blockPos, WorldChunk.BlockEntityCreationType.CHECK);
+                            BlockEntity tileEntity = chunk.getBlockEntity(blockPos, WorldChunk.BlockEntityCreationType.CHECK);
                             if (BlockEntityRenderDispatcher.INSTANCE.getRenderer(tileEntity) != null) {
                                 renderData.globalBlockEntities.add(tileEntity);
                             }
@@ -135,28 +135,28 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         var pass = block.getRenderLayer();
 
                         //? if <1.8 {
-                        tesselator.start();
+                        /*tesselator.start();
                         renderBlocks.tessellateBlock(block, x, y, z);
                         buildContext.copyRawBuffer(IntBuffer.wrap(extTesselator.celeritas$getRawBuffer()), extTesselator.celeritas$getVertexCount(), buffers, buffers.getRenderPassConfiguration().getMaterialForRenderType(pass));
                         extTesselator.celeritas$reset();
-                        //?} else {
-                        /*tesselator.begin(GL11C.GL_QUADS, com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK);
+                        *///?} else {
+                        tesselator.begin(GL11C.GL_QUADS, com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK);
                         renderBlocks.tessellate(blockState, blockPos, region, tesselator);
                         tesselator.end();
                         buildContext.copyRawBuffer(tesselator.getBuffer().asIntBuffer(), tesselator.getVertexCount(), buffers, buffers.getRenderPassConfiguration().getMaterialForRenderType(pass));
                         tesselator.clear();
-                        *///?}
+                        //?}
 
                         //? if <1.7 {
-                        boolean opaque = Block.IS_OPAQUE[blockId];
+                        //boolean opaque = Block.IS_OPAQUE[blockId];
                         //?} else
-                        //boolean opaque = block.isOpaqueCube();
+                        boolean opaque = block.isOpaqueCube();
 
                         if (opaque) {
                             //? if >=1.8 {
-                            //occluder.markClosed(blockPos.getX(), blockPos.getY(), blockPos.getZ());
+                            occluder.markClosed(blockPos.getX(), blockPos.getY(), blockPos.getZ());
                             //?} else
-                            occluder.markClosed(blockPos);
+                            //occluder.markClosed(blockPos);
                         }
                     }
                 }
@@ -164,7 +164,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         } finally {
             tesselator.offset(0, 0, 0);
             //? if <1.7
-            TessellatorAccessor.celeritas$setTriangleMode(true);
+            //TessellatorAccessor.celeritas$setTriangleMode(true);
         }
 
 
@@ -175,7 +175,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         }
 
         //? if <1.8
-        renderData.hasSkyLight = WorldChunk.hasSkyLight;
+        //renderData.hasSkyLight = WorldChunk.hasSkyLight;
 
         encodeVisibilityData(occluder, renderData);
 

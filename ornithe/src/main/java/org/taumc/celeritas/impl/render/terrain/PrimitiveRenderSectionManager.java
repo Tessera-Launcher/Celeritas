@@ -39,9 +39,9 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
 
     public static PrimitiveRenderSectionManager create(ChunkVertexType vertexType, World world, int renderDistance, CommandList commandList) {
         //? if <1.8 {
-        int idealThreadCount = -1;
+        //int idealThreadCount = -1;
         //?} else
-        //int idealThreadCount = Celeritas.options().performance.chunkBuilderThreads;
+        int idealThreadCount = Celeritas.options().performance.chunkBuilderThreads;
         //? if <1.2 {
         //int maxSection = 8;
         //?} else
@@ -91,14 +91,14 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
         var camBlockPos = positionedViewport.getBlockCoord();
 
         //? if <1.8 {
-        var block = this.world.getBlock(camBlockPos.x(), camBlockPos.y(), camBlockPos.z());
+        //var block = this.world.getBlock(camBlockPos.x(), camBlockPos.y(), camBlockPos.z());
         //?} else
-        //var block = this.world.getBlockState(new net.minecraft.util.math.BlockPos(camBlockPos.x(), camBlockPos.y(), camBlockPos.z())).getBlock();
+        var block = this.world.getBlockState(new net.minecraft.util.math.BlockPos(camBlockPos.x(), camBlockPos.y(), camBlockPos.z())).getBlock();
 
         //? if >=1.7 {
-        //boolean opaque = block.isOpaqueCube();
+        boolean opaque = block.isOpaqueCube();
         //?} else
-        boolean opaque = Block.IS_OPAQUE[block];
+        //boolean opaque = Block.IS_OPAQUE[block];
 
         useOcclusionCulling = !spectator || !opaque;
 
@@ -112,7 +112,7 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
     }
 
     //? if >=1.8 {
-    /*private void populateTileEntities(WorldChunk chunk, int sectionY) {
+    private void populateTileEntities(WorldChunk chunk, int sectionY) {
         if (chunk.isEmpty()) {
             return;
         }
@@ -142,7 +142,7 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
             }
         }
     }
-    *///?}
+    //?}
 
     @Override
     protected @Nullable ChunkBuilderTask<ChunkBuildOutput> createRebuildTask(RenderSection render, int frame) {
@@ -154,7 +154,7 @@ public class PrimitiveRenderSectionManager extends RenderSectionManager {
 
         // TODO: This is a workaround until we properly snapshot chunk sections as is done in 1.12
         //? if >=1.8
-        //populateTileEntities(this.world.getChunkAt(render.getChunkX(), render.getChunkZ()), render.getChunkY());
+        populateTileEntities(this.world.getChunkAt(render.getChunkX(), render.getChunkZ()), render.getChunkY());
 
         return new ChunkBuilderMeshingTask(render, context, frame, this.cameraPosition);
     }

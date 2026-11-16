@@ -1,7 +1,7 @@
 package org.taumc.celeritas.mixin.core;
 
 //? if >=1.8 {
-/*
+
 import net.minecraft.util.TypeInstanceMultiMap;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,14 +18,14 @@ public abstract class TypeInstanceMultimapMixin<T> extends AbstractSet<T> {
     private List<T> instances;
 
 
-    /^*
+    /**
      * @author embeddedt
      * @reason avoid iterator allocation when forEach is called
-     ^/
+     */
     @Override
     public void forEach(Consumer<? super T> action) {
         this.instances.forEach(action);
     }
 }
 
-*///?}
+//?}

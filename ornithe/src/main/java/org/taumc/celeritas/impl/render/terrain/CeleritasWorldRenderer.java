@@ -57,9 +57,9 @@ public class CeleritasWorldRenderer extends SimpleWorldRenderer<World, Primitive
 
     public static CameraState captureCameraState(double ticks) {
         //? if <1.8 {
-        Entity viewEntity = MinecraftAccessor.celeritas$getInstance().camera;
+        //Entity viewEntity = MinecraftAccessor.celeritas$getInstance().camera;
         //?} else
-        //Entity viewEntity = MinecraftAccessor.celeritas$getInstance().getCamera();
+        Entity viewEntity = MinecraftAccessor.celeritas$getInstance().getCamera();
 
         Objects.requireNonNull(viewEntity, "Client must have view entity");
 
@@ -77,14 +77,14 @@ public class CeleritasWorldRenderer extends SimpleWorldRenderer<World, Primitive
     @Override
     public int getEffectiveRenderDistance() {
         //? if <1.7 {
-        int viewDist = MinecraftAccessor.celeritas$getInstance().options.viewDistance;
+        /*int viewDist = MinecraftAccessor.celeritas$getInstance().options.viewDistance;
         if (viewDist > 4) {
             System.err.println("View distance cannot be zero, resetting");
             MinecraftAccessor.celeritas$getInstance().options.viewDistance = viewDist = 0;
         }
         return 16 >> viewDist;
-        //?} else
-        //return MinecraftAccessor.celeritas$getInstance().options.viewDistance;
+        *///?} else
+        return MinecraftAccessor.celeritas$getInstance().options.viewDistance;
     }
 
     @Override
@@ -120,7 +120,7 @@ public class CeleritasWorldRenderer extends SimpleWorldRenderer<World, Primitive
         float partialTicks = partialTicksBoxed;
         for (var blockEntity : list) {
             try {
-                BlockEntityRenderDispatcher.INSTANCE.render(blockEntity, partialTicks /*? if >=1.8 {*//*, -1 *//*?}*/);
+                BlockEntityRenderDispatcher.INSTANCE.render(blockEntity, partialTicks /*? if >=1.8 {*/, -1 /*?}*/);
             } catch(RuntimeException e) {
                 if(blockEntity.isRemoved()) {
                     System.err.println("Suppressing crash from invalid tile entity");

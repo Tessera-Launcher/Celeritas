@@ -14,14 +14,14 @@ public class SpriteTransparencyTracker {
     private static final int NUM_SPRITES_PER_ROW = 16;
 
     //? if <1.5 {
-
+/*
     private final SpriteTransparencyLevel[] levels = new SpriteTransparencyLevel[SPRITE_COUNT];
 
     public SpriteTransparencyTracker() {
         //? if >=1.3 {
-        //var selectedPack = MinecraftAccessor.celeritas$getInstance().texturePacks.getSelected();
+        var selectedPack = MinecraftAccessor.celeritas$getInstance().texturePacks.getSelected();
         //?} else
-        var selectedPack = MinecraftAccessor.celeritas$getInstance().texturePacks.selected;
+        //var selectedPack = MinecraftAccessor.celeritas$getInstance().texturePacks.selected;
         try(var terrainFile = selectedPack.getResource("/terrain.png")) {
             var terrainImage = ImageIO.read(terrainFile);
             int[] contents = terrainImage.getRGB(0, 0, terrainImage.getWidth(), terrainImage.getHeight(), null, 0, terrainImage.getWidth());
@@ -58,5 +58,5 @@ public class SpriteTransparencyTracker {
         return levels[spriteId];
     }
 
-    //?}
+    *///?}
 }

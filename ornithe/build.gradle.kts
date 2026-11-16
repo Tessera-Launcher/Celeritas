@@ -1,6 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import net.fabricmc.loom.task.RemapJarTask
-import java.net.URI
 
 plugins {
     id("celeritas.platform-conventions")
@@ -35,45 +34,17 @@ version = rootProject.version
 
 evaluationDependsOn(":common")
 
-data class VersionData(val uniminedVersion: String, val metadataURL: URI? = null)
-
-val versionDataMap = mapOf(
-        "1.0.0-beta.7.3" to VersionData("b1.7.3"),
-        "1.0.0-beta.8.1" to VersionData( "b1.8.1"),
-        "1.2-alpha.125a" to VersionData("12w05a-1442", file("12w05a.json").toURI())
-)
-
-val isClientServerSplit = stonecutter.eval(project.name, "<1.3")
-
-val featherVersion = if(isClientServerSplit) 23 else 28
-val versionData = versionDataMap.getOrDefault(project.name, VersionData(project.name))
-
-base.archivesName = "celeritas-fabriclike-mc${versionData.uniminedVersion.replace(Regex("^1\\."), "")}"
+base.archivesName = "celeritas-fabriclike-mc8.9"
 
 loom {
-    if (isClientServerSplit) {
-        clientOnlyMinecraftJar()
-    }
     mixin {
         useLegacyMixinAp = false
-    }
-    if (stonecutter.eval(project.name, "<1.6")) {
-        runs.configureEach {
-            // Required by LegacyFix
-            vmArg("--add-opens=java.base/java.lang=ALL-UNNAMED")
-        }
-    }
-}
-
-ploceus {
-    if (isClientServerSplit) {
-        clientOnlyMappings()
     }
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:${versionData.uniminedVersion}")
-    mappings(ploceus.featherMappings(featherVersion.toString()))
+    minecraft("com.mojang:minecraft:1.8.9")
+    mappings(ploceus.featherMappings("28"))
 
     implementation(project(":common")) {
         isTransitive = false
@@ -90,10 +61,6 @@ dependencies {
 
     modImplementation("net.fabricmc:fabric-loader:${rootProject.property("fabricloader")}")
     modImplementation("pl.tomgirl:pylon:${rootProject.property("pylon_version")}")
-    if (stonecutter.eval(project.name, "<1.6")) {
-        // Pylon needs a deAWT mod before 1.6
-        modLocalRuntime("maven.modrinth:legacyfix:26.10")
-    }
 }
 
 tasks.named("validateAccessWidener") {
@@ -123,26 +90,3 @@ val packageJar = tasks.register("packageJar", Copy::class) {
 tasks.named("assemble") {
     dependsOn(packageJar)
 }
-
-/*
-val remapJar = tasks.named<AbstractRemapJarTask>("remapJar") {
-    manifest {
-        attributes(mapOf("Calamus-Generation" to "1"))
-    }
-}
-
-ShadowHelper.createShadowRemapJar(project)
-ProductionJarHelper.configureRemapJar(project)
-LWJGLHelper.convertLwjgl2To3(project)
-ProductionJarHelper.configureProcessedResources(project)
-
-tasks.register("packageJar", Copy::class) {
-    from(tasks.named<ShadowJar>("shadowRemapJar").get().archiveFile)
-    into("${rootProject.layout.buildDirectory.get()}/libs/${project.version}")
-}
-
-tasks.named("genIntellijRuns") {
-    enabled = false
-}
-
- */

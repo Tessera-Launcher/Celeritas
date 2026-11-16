@@ -1,7 +1,7 @@
 package org.taumc.celeritas.mixin.core;
 
 //? if <1.8 {
-import com.llamalad7.mixinextras.sugar.Local;
+/*import com.llamalad7.mixinextras.sugar.Local;
 import it.unimi.dsi.fastutil.Pair;
 import net.minecraft.client.gui.GameGui;
 import net.minecraft.client.render.TextRenderer;
@@ -20,7 +20,7 @@ public class InGameHudMixin {
 
     @Inject(method = "render", slice = @Slice(from = @At(value = "FIELD", target = "Lnet/minecraft/client/options/GameOptions;debug"
             //? if <1.4
-            + "Profiler"
+            //+ "Profiler"
             + "Enabled:Z")), at = @At(value = "INVOKE", target ="Lorg/lwjgl/opengl/GL11;glPopMatrix()V", ordinal = 0))
     private void celeritas$renderDebug(CallbackInfo ci, @Local(ordinal = 0) Window scaler, @Local(ordinal = 0) TextRenderer font) {
         int currentY = 22;
@@ -40,4 +40,4 @@ public class InGameHudMixin {
         }
     }
 }
-//?}
+*///?}

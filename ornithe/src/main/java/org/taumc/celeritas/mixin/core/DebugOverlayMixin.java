@@ -1,7 +1,7 @@
 package org.taumc.celeritas.mixin.core;
 
 //? if >=1.8 {
-/*import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.gui.overlay.DebugOverlay;
 import net.minecraft.text.Formatting;
 import org.spongepowered.asm.mixin.Mixin;
@@ -26,4 +26,4 @@ public class DebugOverlayMixin {
         return original;
     }
 }
-*///?}
+//?}

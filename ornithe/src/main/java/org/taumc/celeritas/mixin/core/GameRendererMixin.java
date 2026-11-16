@@ -34,7 +34,7 @@ public class GameRendererMixin {
     }
 
     //? if <1.8 {
-    private boolean lastVsyncStatus;
+    /*private boolean lastVsyncStatus;
 
     @Inject(method = "render", at = @At("HEAD"))
     private void updateVsyncStatus(float par1, CallbackInfo ci) {
@@ -49,5 +49,5 @@ public class GameRendererMixin {
     private boolean celeritas$forceNormalTranslucentTerrainRendering(GameOptions instance) {
         return false;
     }
-    //?}
+    *///?}
 }

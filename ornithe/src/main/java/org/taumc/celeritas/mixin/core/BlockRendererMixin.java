@@ -1,7 +1,7 @@
 package org.taumc.celeritas.mixin.core;
 
 //? if <1.8 {
-import net.minecraft.client.render.BlockRenderer;
+/*import net.minecraft.client.render.BlockRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -13,4 +13,4 @@ public class BlockRendererMixin {
         return true;
     }
 }
-//?}
+*///?}

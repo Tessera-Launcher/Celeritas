@@ -1,40 +1,42 @@
 # Celeritas
 
-This is the source tree for Celeritas, a fork of Embeddium and Oculus/Iris. It supports many Minecraft
-versions and loaders from one tree, using Stonecutter. Rendering code that doesn't depend on
-Minecraft lives in `:common`.
+This tree exists to build one artifact: the statically patched Minecraft 1.8.9 client
+(`patched-client/build/libs/client.jar`) and the patch that produces it from a vanilla client
+(`client.tpatch`). There is no mod jar for 1.8.9 and no other Minecraft version is supported.
 
 ## Layout
 
-- `common/`: shared rendering core (`org.embeddedt.embeddium.impl.*`). New Celeritas-owned API goes
-  in `org.taumc.celeritas`. The build script is Groovy (`common/build.gradle`). JMH benches are in
+- `common/`: shared rendering core (`org.embeddedt.embeddium.impl.*`). Celeritas-owned API goes in
+  `org.taumc.celeritas`. The build script is Groovy (`common/build.gradle`). JMH benches are in
   `common/src/jmh`, tests in `common/src/test`.
-- `modern/`: the Stonecutter tree for 1.16.5 to 26.x. Sources live in `modern/src/main/<set>`. The
-  build scripts in `buildSrc/src/main/kotlin/celeritas.*-conventions.gradle.kts` choose which source
-  sets each target compiles:
-  - `java`: always compiled.
-  - `modern_java`: pre-26.1.
-  - `postmodern_java`: 26.1 and later.
-  - `shaders_java` and `batching_java`: the Iris fork, shared by every shader-enabled target.
-  - `shaders_modern_java` and `shaders_postmodern_java`: Iris code for one side of the 26.1 split.
-- `forge122/` (RetroFuturaGradle), `forge1710/` (RFG) and `ornithe/` (Loom/Ploceus): the legacy
-  loaders. They have their own copies of some classes that `modern/` also has, so a fix may need to
-  go in more than one place.
-- The repo root has no `src/`. Always use module-prefixed paths.
-- Version and dependency pins live in the root `gradle.properties`, keyed by version suffix.
-- `modern/versions/<mc>-<loader>/build/generated/stonecutter/` holds generated output. Read it to see
-  what one target actually compiles, but never edit it. Many directories under `modern/versions/` are
-  stale leftovers. Only the targets listed in `settings.gradle.kts` are real.
+- `ornithe/`: the 1.8.9 target (Loom + Ploceus/Feather mappings + Pylon), a plain single-version
+  project. It shades `:common` into `celeritas-fabriclike-mc8.9-<version>.jar`, which is the input
+  to the patcher. Version and dependency pins live in the root `gradle.properties`.
+- `patched-client/`: `OfflinePatcher` applies `mixins.celeritas.client.json` to the decompressed
+  vanilla classes and runs Tessera's LWJGL3 rewriter, then writes `client.jar`; `patch-tool/` (Rust)
+  turns `client-base.jar` + `client.jar` into `client.tpatch`. See `patched-client/README.md` for
+  the full pipeline.
+- `patch-tool/`: the `.tpatch` generator/applier (`cargo build --release`).
+
+`ornithe/src/main` was flattened from a Stonecutter tree, so some files still carry `//? if`
+comment markers with the inactive branches commented out. They are plain comments now; the active
+branch is the one that is uncommented.
 
 ## Building and verifying
 
-- Use qualified paths from the repo root, like `./gradlew :modern:1.20.1-forge:compileJava` or
-  `:common:compileJava`. Select targets with `-Pceleritas_target_versions=<mc>`.
+- Full chain: `./gradlew :ornithe:packageJar`, then `./patched-client/remap-official.sh`,
+  then `./gradlew :patched-client:assemble`. The last step downloads the official 1.8.9 client and
+  its libraries from Mojang into `patched-client/build/base/` and verifies their SHA-1.
 - Builds are slow and memory-hungry, so run them one at a time.
-- Compiling the active target (`1.20.1-forge`) doesn't check other version branches. After editing
-  shared or version-gated code, also compile a target on the other side of the condition.
-- `:common` must stay compatible with fastutil 7.1.0.
-- JMH benches: `./gradlew :common:jmh -Pjmhargs="..."`.
+- `:common` must stay compatible with fastutil 7.1.0 (the patched client runs against Tessera's
+  fastutil 8.5.x, but `common` is compiled against the older API surface).
+- The patched client must be byte-reproducible: two builds of the same inputs must produce the same
+  `client.jar`/`client.tpatch` so Tessera's AOT cache stays valid. That is why the patcher pins
+  Mixin's random `@MixinMerged.sessionId` and the uid-based names of generated members. Check with
+  `./gradlew :patched-client:generatePatch --rerun-tasks` twice and compare `sha256sum`.
+- MixinExtras is copied into the output only where a patched class actually references it; the
+  patcher fails the build if a reference would be left dangling. Do not go back to copying the whole
+  runtime.
 - Never run `taugradle_publish`, because it publishes artifacts.
 
 ## Licensing
@@ -44,3 +46,5 @@ Minecraft lives in `:common`.
   that clearly depend on or derive from newer Sodium either.
 - Celeritas has no addon API. Don't add compat shims or feature flags to keep third-party addons
   working.
+- The generated `client.jar` embeds Tessera's LWJGL3 shim (GPL-3.0-or-later); Celeritas' own code
+  stays LGPL-3.0.
