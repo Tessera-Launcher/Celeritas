@@ -50,6 +50,9 @@ public final class RemapJar {
 
         Path parent = output.toAbsolutePath().getParent();
         Files.createDirectories(parent);
+        // tiny-remapper adds to an existing archive; start from scratch so classes
+        // deleted from the sources do not survive in a rebuilt output.
+        Files.deleteIfExists(output);
 
         TinyRemapper remapper = TinyRemapper.newRemapper()
                 .withMappings(TinyUtils.createTinyMappingProvider(mappings, from, to))
