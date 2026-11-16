@@ -38,8 +38,10 @@ third-party classes that call LWJGL2 (currently paulscode's OpenAL wrapper) are
 rewritten and copied into the jar so they win over the original library jars.
 `patched-client/run-test.sh` does this and launches without `-javaagent`.
 
-`-PceleritasJar=...` overrides the remapped input jar. Mixin, MixinExtras and ASM
-are build-time dependencies only; the patcher filters them out of the output.
+`-PceleritasJar=...` overrides the remapped input jar. Mixin and ASM are
+build-time dependencies only and are filtered out of the output. MixinExtras is
+build-time too, except for the handful of runtime classes the patched classes
+still reference (see below).
 
 ## What it does
 
@@ -48,10 +50,22 @@ are build-time dependencies only; the patcher filters them out of the output.
   classes, and library classes that still use LWJGL2.
 - Replaces Mixin's `CallbackInfo`/`CallbackInfoReturnable` references with the
   tiny `org.taumc.celeritas.patch` shims, so the result needs no Mixin runtime.
-- Merges Celeritas, Tessera's LWJGL3 shim, MixinExtras' runtime and the generated
-  `@Local` implementations.
+- Merges Celeritas, Tessera's LWJGL3 shim and the generated `@Local`
+  implementations.
+- Copies only the MixinExtras classes the patched classes can actually reach
+  (currently `LocalBooleanRef`, its generated implementation and
+  `LocalRefRuntime`). The injectors, the expression parser, the annotation
+  processor and the transformer extensions are build time only, so the whole
+  runtime is not shipped. The walk follows constant-pool references from every
+  written class, and the patcher refuses to write an output that still mentions
+  a MixinExtras class it did not copy.
 - Drops `META-INF/*.SF`, `*.RSA`, `*.DSA`, `*.EC` and `Sealed:` lines, and emits
   deterministic entry timestamps.
+- Pins the parts of Mixin's output that vary per run: the random
+  `@MixinMerged.sessionId` and the `md<uid>$…`/`fd<uid>$…` names of generated
+  members (the uid is the order in which target classes asked for one) are
+  replaced with declaration-order names. Two builds of the same inputs are
+  therefore byte identical, which is what keeps Tessera's AOT cache valid.
 
 fastutil is provided by Tessera: its installer adds the same
 `it.unimi.dsi:fastutil:8.5.18` artifact that modern version indexes already list.

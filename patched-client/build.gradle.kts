@@ -36,8 +36,9 @@ repositories {
 }
 
 dependencies {
-    // Build-time only: Mixin, MixinExtras and ASM apply the patches. None of
-    // them are merged into the output client.jar.
+    // Build-time only: Mixin and ASM apply the patches and never reach the
+    // output client.jar. MixinExtras does supply a few runtime classes, but the
+    // patcher copies only the ones the patched classes reference.
     implementation("net.fabricmc:sponge-mixin:0.17.5+mixin.0.8.7")
     implementation("io.github.llamalad7:mixinextras-fabric:0.5.5")
     implementation("org.ow2.asm:asm:9.8")

@@ -5,8 +5,11 @@ import com.llamalad7.mixinextras.utils.ClassGenUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.commons.ClassRemapper;
-import org.objectweb.asm.commons.SimpleRemapper;
+import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.launch.MixinBootstrap;
 import org.spongepowered.asm.mixin.Mixins;
 import org.spongepowered.asm.transformers.MixinClassWriter;
@@ -20,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,13 +52,33 @@ public final class OfflinePatcher {
             "org/lwjgl/", "tessera/");
     private static final Pattern GENERATED = Pattern.compile(
             "com/llamalad7/mixinextras/sugar/impl/ref/generated/[A-Za-z0-9_$]+");
-    private static final SimpleRemapper CALLBACKS = new SimpleRemapper(Map.of(
+    /** Any MixinExtras type the patched classes mention in their constant pool. */
+    private static final Pattern MIXIN_EXTRAS_REF = Pattern.compile(
+            "com/llamalad7/[A-Za-z0-9_$/]+");
+    private static final Map<String, String> CALLBACKS = Map.of(
             "org/spongepowered/asm/mixin/injection/callback/CallbackInfo",
             "org/taumc/celeritas/patch/CallbackInfo",
             "org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable",
-            "org/taumc/celeritas/patch/CallbackInfoReturnable"));
+            "org/taumc/celeritas/patch/CallbackInfoReturnable");
+    /**
+     * Members Mixin generates while merging: {@code md<uid>$<name>$<index>},
+     * {@code <name>_$md$<uid>$<index>} and {@code fd<uid>$<name>$<index>}.  The
+     * uid is the order in which a target class first needed one, which is not
+     * stable between runs.
+     */
+    private static final Pattern GENERATED_METHOD = Pattern.compile(
+            "md[0-9a-f]+\\$.*|.*_\\$md\\$[0-9a-f]+\\$[0-9a-f]+");
+    private static final Pattern GENERATED_FIELD = Pattern.compile("fd[0-9a-f]+\\$.*");
     private static final String[] SHIMS = {"CallbackInfo", "CallbackInfoReturnable"};
     private static final String CLIENT_PATCH = "Tessera-Client-Patch: celeritas-lwjgl3";
+    private static final String MIXIN_MERGED = "Lorg/spongepowered/asm/mixin/transformer/meta/MixinMerged;";
+    /**
+     * Mixin stamps every merged member with a random per-run {@code sessionId}
+     * in {@code @MixinMerged}.  Nothing reads it at runtime, but it changes the
+     * bytes of an otherwise identical rebuild and so invalidates Tessera's AOT
+     * cache, which keys the class path by entry size and timestamp.
+     */
+    private static final String SESSION_ID = "celeritas";
 
     private OfflinePatcher() {
     }
@@ -100,6 +124,9 @@ public final class OfflinePatcher {
         Set<String> written = new HashSet<>();
         Set<String> baseWritten = new HashSet<>();
         Set<String> generated = new TreeSet<>();
+        // Every MixinExtras name any written class refers to.  The runtime is
+        // pruned down to exactly the closure of this set.
+        Set<String> referenced = new TreeSet<>();
         int patched = 0;
         int merged = 0;
         int rewrittenLibraries = 0;
@@ -138,18 +165,21 @@ public final class OfflinePatcher {
                     }
                     bytes = transformed;
                     collectGenerated(bytes, generated);
+                    collectReferences(bytes, referenced);
                 }
                 writeBase(out, written, name, bytes);
             }
 
-            merged += addCeleritas(out, written, celeritas);
+            merged += addCeleritas(out, written, celeritas, referenced);
             merged += addLwjgl3(out, written, lwjgl3Shim);
-            merged += addMixinExtras(out, written, mixinextras);
             for (Path library : libraries) {
-                rewrittenLibraries += addRewrittenLibrary(out, written, library);
+                rewrittenLibraries += addRewrittenLibrary(out, written, library, referenced);
             }
             merged += addShims(out, written);
-            merged += addGenerated(out, written, generated);
+            merged += addGenerated(out, written, generated, referenced);
+            // Last, because it needs to see every other entry's references.
+            merged += addMixinExtras(out, written, mixinextras, referenced);
+            requireMixinExtrasComplete(written, referenced);
 
             if (!written.contains("META-INF/MANIFEST.MF")) {
                 writeAdded(out, written, "META-INF/MANIFEST.MF",
@@ -185,27 +215,111 @@ public final class OfflinePatcher {
         new ClassReader(bytes).accept(node, 0);
         byte[] result = bytes;
         if (MixinBridge.transform(node)) {
+            pinSessionIds(node);
+            Map<String, String> renames = pinGeneratedNames(node);
             ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             node.accept(writer);
-            result = remapCallbacks(writer.toByteArray());
+            result = remapCallbacks(writer.toByteArray(), renames);
         }
         byte[] rewritten = Lwjgl3Rewriter.rewrite(name, result);
         return rewritten == null ? result : rewritten;
     }
 
     /**
+     * Replaces Mixin's random {@code @MixinMerged.sessionId} with a constant so
+     * two runs over the same inputs produce the same bytes.
+     */
+    private static void pinSessionIds(ClassNode node) {
+        pinSessionIds(node.visibleAnnotations);
+        pinSessionIds(node.invisibleAnnotations);
+        for (FieldNode field : node.fields) {
+            pinSessionIds(field.visibleAnnotations);
+            pinSessionIds(field.invisibleAnnotations);
+        }
+        for (MethodNode method : node.methods) {
+            pinSessionIds(method.visibleAnnotations);
+            pinSessionIds(method.invisibleAnnotations);
+        }
+    }
+
+    private static void pinSessionIds(List<AnnotationNode> annotations) {
+        if (annotations == null) {
+            return;
+        }
+        for (AnnotationNode annotation : annotations) {
+            if (!MIXIN_MERGED.equals(annotation.desc) || annotation.values == null) {
+                continue;
+            }
+            List<Object> values = annotation.values;
+            for (int i = 0; i + 1 < values.size(); i += 2) {
+                if ("sessionId".equals(values.get(i))) {
+                    values.set(i + 1, SESSION_ID);
+                }
+            }
+        }
+    }
+
+    /**
+     * Renames Mixin's generated members by declaration order, so their names no
+     * longer depend on the order target classes registered for a uid.  The
+     * members are private and only referenced from the class itself, so a local
+     * rename is enough.
+     */
+    private static Map<String, String> pinGeneratedNames(ClassNode node) {
+        Map<String, String> renames = new HashMap<>();
+        int generated = 0;
+        for (MethodNode method : node.methods) {
+            if (GENERATED_METHOD.matcher(method.name).matches()) {
+                renames.put(method.name, "md$" + generated++);
+            }
+        }
+        generated = 0;
+        for (FieldNode field : node.fields) {
+            if (GENERATED_FIELD.matcher(field.name).matches()) {
+                renames.put(field.name, "fd$" + generated++);
+            }
+        }
+        return renames;
+    }
+
+    /**
      * Mixin's generated callbacks are the only part of the Mixin runtime a
      * transformed class still touches.  Move those two value objects to a tiny
-     * local shim so the output does not need Mixin (or ASM) at runtime.
+     * local shim so the output does not need Mixin (or ASM) at runtime.  The
+     * same pass applies the generated-member renames.
      */
-    private static byte[] remapCallbacks(byte[] bytes) {
+    private static byte[] remapCallbacks(byte[] bytes, Map<String, String> members) {
         ClassWriter writer = new ClassWriter(0);
-        new ClassReader(bytes).accept(new ClassRemapper(writer, CALLBACKS), 0);
+        new ClassReader(bytes).accept(new ClassRemapper(writer, new Renamer(members)), 0);
         return writer.toByteArray();
     }
 
-    private static int addCeleritas(ZipOutputStream out, Set<String> written, Path jar)
-            throws Exception {
+    /** Maps the Mixin callback classes and the renamed generated members. */
+    private static final class Renamer extends Remapper {
+        private final Map<String, String> members;
+
+        Renamer(Map<String, String> members) {
+            this.members = members;
+        }
+
+        @Override
+        public String map(String internalName) {
+            return CALLBACKS.getOrDefault(internalName, internalName);
+        }
+
+        @Override
+        public String mapMethodName(String owner, String name, String descriptor) {
+            return members.getOrDefault(name, name);
+        }
+
+        @Override
+        public String mapFieldName(String owner, String name, String descriptor) {
+            return members.getOrDefault(name, name);
+        }
+    }
+
+    private static int addCeleritas(ZipOutputStream out, Set<String> written, Path jar,
+                                    Set<String> referenced) throws Exception {
         int added = 0;
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -225,6 +339,9 @@ public final class OfflinePatcher {
                     }
                 }
                 if (writeAdded(out, written, safe(name), bytes)) {
+                    if (name.endsWith(".class")) {
+                        collectReferences(bytes, referenced);
+                    }
                     added++;
                 }
             }
@@ -254,23 +371,79 @@ public final class OfflinePatcher {
         return added;
     }
 
-    private static int addMixinExtras(ZipOutputStream out, Set<String> written, Path jar) throws Exception {
-        int added = 0;
+    /**
+     * Copies only the MixinExtras classes the patched client can actually reach.
+     * The rest of the runtime (the annotation processor, the expression parser,
+     * the injectors and the transformer extensions) is build-time only; shipping
+     * it used to add 500 unused classes to both the client jar and the patch.
+     */
+    private static int addMixinExtras(ZipOutputStream out, Set<String> written, Path jar,
+                                      Set<String> referenced) throws Exception {
+        Map<String, byte[]> available = new LinkedHashMap<>();
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
-                if (entry.isDirectory() || signature(name) || skipMetadata(name)
+                if (entry.isDirectory() || signature(name) || !name.endsWith(".class")
                         || !name.startsWith("com/llamalad7/")) {
                     continue;
                 }
-                if (writeAdded(out, written, safe(name), zip.getInputStream(entry).readAllBytes())) {
-                    added++;
+                available.put(safe(name), zip.getInputStream(entry).readAllBytes());
+            }
+        }
+
+        Set<String> pending = new TreeSet<>();
+        for (String name : referenced) {
+            if (available.containsKey(name + ".class")) {
+                pending.add(name);
+            }
+        }
+        Set<String> needed = new TreeSet<>();
+        while (!pending.isEmpty()) {
+            String name = pending.iterator().next();
+            pending.remove(name);
+            if (!needed.add(name)) {
+                continue;
+            }
+            Set<String> found = new TreeSet<>();
+            collectReferences(available.get(name + ".class"), found);
+            // Closure members are reachable too, so their references must be
+            // part of the completeness check as well.
+            referenced.addAll(found);
+            for (String ref : found) {
+                if (available.containsKey(ref + ".class") && !needed.contains(ref)) {
+                    pending.add(ref);
                 }
             }
         }
+
+        int added = 0;
+        for (Map.Entry<String, byte[]> entry : available.entrySet()) {
+            String name = entry.getKey();
+            if (!needed.contains(name.substring(0, name.length() - ".class".length()))) {
+                continue;
+            }
+            if (writeAdded(out, written, name, entry.getValue())) {
+                added++;
+            }
+        }
+        System.out.println("mixinextras: kept " + needed.size() + " of " + available.size()
+                + " classes");
         return added;
+    }
+
+    /**
+     * Refuse to write a client that still mentions a MixinExtras class the
+     * patcher did not copy.  The closure above should make this impossible;
+     * the check exists so a future mixin cannot silently break at runtime.
+     */
+    private static void requireMixinExtrasComplete(Set<String> written, Set<String> referenced) {
+        for (String name : referenced) {
+            if (name.startsWith("com/llamalad7/") && !written.contains(name + ".class")) {
+                throw new IllegalStateException("missing MixinExtras runtime class " + name);
+            }
+        }
     }
 
     /**
@@ -278,8 +451,8 @@ public final class OfflinePatcher {
      * rewritten copies (for example paulscode's OpenAL wrapper) are placed in
      * the client jar.  The client jar must precede the ordinary libraries.
      */
-    private static int addRewrittenLibrary(ZipOutputStream out, Set<String> written, Path jar)
-            throws Exception {
+    private static int addRewrittenLibrary(ZipOutputStream out, Set<String> written, Path jar,
+                                          Set<String> referenced) throws Exception {
         if (!Files.isRegularFile(jar)) {
             return 0;
         }
@@ -298,6 +471,7 @@ public final class OfflinePatcher {
                     continue;
                 }
                 if (writeAdded(out, written, safe(name), rewritten)) {
+                    collectReferences(rewritten, referenced);
                     added++;
                     System.out.println("rewrote library class " + jar.getFileName() + "!" + name);
                 }
@@ -322,13 +496,15 @@ public final class OfflinePatcher {
         return added;
     }
 
-    private static int addGenerated(ZipOutputStream out, Set<String> written, Set<String> referenced)
+    private static int addGenerated(ZipOutputStream out, Set<String> written, Set<String> referenced,
+                                    Set<String> referencedMixins)
             throws IOException {
         Map<String, byte[]> definitions = new LinkedHashMap<>(ClassGenUtils.getDefinitions());
         int added = 0;
         for (Map.Entry<String, byte[]> entry : definitions.entrySet()) {
             String name = entry.getKey().replace('.', '/') + ".class";
             if (writeAdded(out, written, name, entry.getValue())) {
+                collectReferences(entry.getValue(), referencedMixins);
                 added++;
             }
         }
@@ -342,6 +518,18 @@ public final class OfflinePatcher {
 
     private static void collectGenerated(byte[] bytes, Set<String> out) {
         Matcher matcher = GENERATED.matcher(new String(bytes, StandardCharsets.ISO_8859_1));
+        while (matcher.find()) {
+            out.add(matcher.group());
+        }
+    }
+
+    /**
+     * Collects every MixinExtras internal name a class file mentions.  Constant
+     * pool class entries, descriptors and signatures all spell the name out in
+     * full, so a plain scan sees everything an ordinary reference walk would.
+     */
+    private static void collectReferences(byte[] bytes, Set<String> out) {
+        Matcher matcher = MIXIN_EXTRAS_REF.matcher(new String(bytes, StandardCharsets.ISO_8859_1));
         while (matcher.find()) {
             out.add(matcher.group());
         }
