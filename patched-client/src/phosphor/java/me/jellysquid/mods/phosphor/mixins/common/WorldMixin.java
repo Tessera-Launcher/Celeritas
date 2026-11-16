@@ -1,6 +1,7 @@
 package me.jellysquid.mods.phosphor.mixins.common;
 
 import me.jellysquid.mods.phosphor.api.ILightingEngineProvider;
+import me.jellysquid.mods.phosphor.mod.PhosphorMod;
 import me.jellysquid.mods.phosphor.mod.world.lighting.LightingEngine;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.LightType;
@@ -20,9 +21,19 @@ public abstract class WorldMixin implements ILightingEngineProvider {
      *
      * @author JellySquid
      */
+    // Celeritas: the patched client has no entrypoint that would initialize
+    // PhosphorMod, so do it when the first world is constructed. This also makes
+    // the log state whether the engine is active.
+    private static boolean celeritas$logged;
+
     @Inject(method = "<init>", at = @At("RETURN"))
     private void onConstructed(CallbackInfo ci) {
         this.lightingEngine = new LightingEngine((World) (Object) this);
+
+        if (!celeritas$logged) {
+            celeritas$logged = true;
+            PhosphorMod.LOGGER.info("Phosphor lighting engine active (config: config/phosphor-legacy.json)");
+        }
     }
 
     /**
