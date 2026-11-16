@@ -104,8 +104,7 @@ configurations["celeritasCompileOnly"].extendsFrom(celeritasShaded)
 
 java {
     toolchain {
-        // Both source sets are Java 21; the patcher itself never ships.
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -289,7 +288,8 @@ val remapCeleritasToOfficial = registerRemapTask(
     }
 ).also { it.configure { dependsOn(remapCeleritasToIntermediary, remapClientToIntermediary) } }
 
-// The mod classes are Java 21, matching what the removed Loom build produced.
+// The mod classes are Java 21, matching the removed Loom build. The patcher and
+// its CallbackInfo shims are Java 25, like the prebuilt LWJGL3 shim they ship with.
 tasks.named<JavaCompile>("compileCeleritasJava") {
     javaCompiler.set(javaToolchains.compilerFor {
         languageVersion.set(JavaLanguageVersion.of(21))
